@@ -28,9 +28,3 @@ Thumbs.db
 
 # TypeScript
 *.tsbuildinfo
-
-# Prisma AI skills
-**/.agents/
-**/.claude/
-**/.cursor/
-**/.devin/

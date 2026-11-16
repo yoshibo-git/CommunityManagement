@@ -16,7 +16,7 @@ model bai_dang {
   noi_dung       String     @db.Text
   hinh_anh       String?    @db.VarChar(500)
   trang_thai     String     @default("draft") @db.VarChar(30)
-  nguoi_dung     nguoi_dung @relation(fields: [id_nguoi_dang], references: [id_nguoi_dung], map: "fk_bai_dang_nguoi_dang")
+  nguoi_dung     nguoi_dung @relation(fields: [id_nguoi_dang], references: [id_nguoi_dung], onDelete: Restrict, onUpdate: Cascade, map: "fk_bai_dang_nguoi_dang")
 
   @@index([id_nguoi_dang], map: "idx_bai_dang_nguoi_dang")
 }
@@ -31,8 +31,8 @@ model chi_tiet_hoat_dong {
   vi_do                 Decimal?             @db.Decimal(10, 7)
   kinh_do               Decimal?             @db.Decimal(10, 7)
   yeu_cau_check_out     Boolean              @default(false)
-  hoat_dong             hoat_dong            @relation(fields: [id_hoat_dong], references: [id_hoat_dong], onDelete: Cascade, map: "fk_chi_tiet_hoat_dong_hoat_dong")
-  nguoi_dung            nguoi_dung?          @relation(fields: [id_nguoi_dung], references: [id_nguoi_dung], map: "fk_chi_tiet_hoat_dong_nguoi_dung")
+  hoat_dong             hoat_dong            @relation(fields: [id_hoat_dong], references: [id_hoat_dong], onDelete: Cascade, onUpdate: Cascade, map: "fk_chi_tiet_hoat_dong_hoat_dong")
+  nguoi_dung            nguoi_dung?          @relation(fields: [id_nguoi_dung], references: [id_nguoi_dung], onDelete: SetNull, onUpdate: Cascade, map: "fk_chi_tiet_hoat_dong_nguoi_dung")
   phan_cong_nhiem_vu    phan_cong_nhiem_vu[]
   phien_diem_danh       phien_diem_danh[]
 
@@ -45,8 +45,8 @@ model dang_ky_hoat_dong {
   id_hoat_dong      Int                 @db.UnsignedInt
   thoi_gian_dang_ky DateTime            @default(now()) @db.DateTime(0)
   trang_thai        String              @default("registered") @db.VarChar(30)
-  hoat_dong         hoat_dong           @relation(fields: [id_hoat_dong], references: [id_hoat_dong], onDelete: Cascade, map: "fk_dang_ky_hoat_dong")
-  nguoi_dung        nguoi_dung          @relation(fields: [id_nguoi_dung], references: [id_nguoi_dung], map: "fk_dang_ky_nguoi_dung")
+  hoat_dong         hoat_dong           @relation(fields: [id_hoat_dong], references: [id_hoat_dong], onDelete: Cascade, onUpdate: Cascade, map: "fk_dang_ky_hoat_dong")
+  nguoi_dung        nguoi_dung          @relation(fields: [id_nguoi_dung], references: [id_nguoi_dung], onDelete: Restrict, onUpdate: Cascade, map: "fk_dang_ky_nguoi_dung")
   ket_qua_diem_danh ket_qua_diem_danh[]
 
   @@unique([id_nguoi_dung, id_hoat_dong], map: "uq_dang_ky_nguoi_dung_hoat_dong")
@@ -66,8 +66,8 @@ model de_xuat_hoat_dong {
   trang_thai        String           @default("pending") @db.VarChar(30)
   id_nguoi_duyet    Int?             @db.UnsignedInt
   ly_do_tu_choi     String?          @db.Text
-  don_vi_ben_ngoai  don_vi_ben_ngoai @relation(fields: [id_don_vi], references: [id_don_vi], map: "fk_de_xuat_don_vi")
-  nguoi_dung        nguoi_dung?      @relation(fields: [id_nguoi_duyet], references: [id_nguoi_dung], map: "fk_de_xuat_nguoi_duyet")
+  don_vi_ben_ngoai  don_vi_ben_ngoai @relation(fields: [id_don_vi], references: [id_don_vi], onDelete: Restrict, onUpdate: Cascade, map: "fk_de_xuat_don_vi")
+  nguoi_dung        nguoi_dung?      @relation(fields: [id_nguoi_duyet], references: [id_nguoi_dung], onDelete: SetNull, onUpdate: Cascade, map: "fk_de_xuat_nguoi_duyet")
   hoat_dong         hoat_dong?
 
   @@index([id_don_vi], map: "idx_de_xuat_don_vi")
@@ -79,7 +79,7 @@ model diem_minh_chung {
   id_minh_chung        Int                  @unique(map: "uq_diem_minh_chung") @db.UnsignedInt
   so_diem              Int
   ngay_cong_diem       DateTime             @default(now()) @db.DateTime(0)
-  minh_chung_hoat_dong minh_chung_hoat_dong @relation(fields: [id_minh_chung], references: [id_minh_chung], onDelete: Cascade, map: "fk_diem_minh_chung_minh_chung")
+  minh_chung_hoat_dong minh_chung_hoat_dong @relation(fields: [id_minh_chung], references: [id_minh_chung], onDelete: Cascade, onUpdate: Cascade, map: "fk_diem_minh_chung_minh_chung")
 }
 
 model don_vi_ben_ngoai {
@@ -103,9 +103,9 @@ model hoat_dong {
   ke_hoach_hoat_dong String?             @db.VarChar(500)
   chi_tiet_hoat_dong chi_tiet_hoat_dong?
   dang_ky_hoat_dong  dang_ky_hoat_dong[]
-  de_xuat_hoat_dong  de_xuat_hoat_dong?  @relation(fields: [id_de_xuat], references: [id_de_xuat], map: "fk_hoat_dong_de_xuat")
-  don_vi_ben_ngoai   don_vi_ben_ngoai?   @relation(fields: [id_don_vi], references: [id_don_vi], map: "fk_hoat_dong_don_vi")
-  nguoi_dung         nguoi_dung          @relation(fields: [id_nguoi_tao], references: [id_nguoi_dung], map: "fk_hoat_dong_nguoi_tao")
+  de_xuat_hoat_dong  de_xuat_hoat_dong?  @relation(fields: [id_de_xuat], references: [id_de_xuat], onDelete: SetNull, onUpdate: Cascade, map: "fk_hoat_dong_de_xuat")
+  don_vi_ben_ngoai   don_vi_ben_ngoai?   @relation(fields: [id_don_vi], references: [id_don_vi], onDelete: SetNull, onUpdate: Cascade, map: "fk_hoat_dong_don_vi")
+  nguoi_dung         nguoi_dung          @relation(fields: [id_nguoi_tao], references: [id_nguoi_dung], onDelete: Restrict, onUpdate: Cascade, map: "fk_hoat_dong_nguoi_tao")
   thong_bao          thong_bao[]
 
   @@index([id_don_vi], map: "idx_hoat_dong_don_vi")
@@ -119,8 +119,8 @@ model ket_qua_diem_danh {
   thoi_gian_diem_danh DateTime          @default(now()) @db.DateTime(0)
   vi_do               Decimal?          @db.Decimal(10, 7)
   kinh_do             Decimal?          @db.Decimal(10, 7)
-  dang_ky_hoat_dong   dang_ky_hoat_dong @relation(fields: [id_dang_ky], references: [id_dang_ky], map: "fk_ket_qua_dang_ky")
-  phien_diem_danh     phien_diem_danh   @relation(fields: [id_phien_diem_danh], references: [id_phien_diem_danh], onDelete: Cascade, map: "fk_ket_qua_phien_diem_danh")
+  dang_ky_hoat_dong   dang_ky_hoat_dong @relation(fields: [id_dang_ky], references: [id_dang_ky], onDelete: Restrict, onUpdate: Cascade, map: "fk_ket_qua_dang_ky")
+  phien_diem_danh     phien_diem_danh   @relation(fields: [id_phien_diem_danh], references: [id_phien_diem_danh], onDelete: Cascade, onUpdate: Cascade, map: "fk_ket_qua_phien_diem_danh")
 
   @@unique([id_phien_diem_danh, id_dang_ky], map: "uq_ket_qua_phien_dang_ky")
   @@index([id_dang_ky], map: "idx_ket_qua_dang_ky")
@@ -145,8 +145,8 @@ model minh_chung_hoat_dong {
   id_nguoi_duyet                                             Int?             @db.UnsignedInt
   ly_do_tu_choi                                              String?          @db.Text
   diem_minh_chung                                            diem_minh_chung?
-  nguoi_dung_minh_chung_hoat_dong_id_nguoi_duyetTonguoi_dung nguoi_dung?      @relation("minh_chung_hoat_dong_id_nguoi_duyetTonguoi_dung", fields: [id_nguoi_duyet], references: [id_nguoi_dung], map: "fk_minh_chung_nguoi_duyet")
-  nguoi_dung_minh_chung_hoat_dong_id_nguoi_nopTonguoi_dung   nguoi_dung       @relation("minh_chung_hoat_dong_id_nguoi_nopTonguoi_dung", fields: [id_nguoi_nop], references: [id_nguoi_dung], map: "fk_minh_chung_nguoi_nop")
+  nguoi_dung_minh_chung_hoat_dong_id_nguoi_duyetTonguoi_dung nguoi_dung?      @relation("minh_chung_hoat_dong_id_nguoi_duyetTonguoi_dung", fields: [id_nguoi_duyet], references: [id_nguoi_dung], onDelete: SetNull, onUpdate: Cascade, map: "fk_minh_chung_nguoi_duyet")
+  nguoi_dung_minh_chung_hoat_dong_id_nguoi_nopTonguoi_dung   nguoi_dung       @relation("minh_chung_hoat_dong_id_nguoi_nopTonguoi_dung", fields: [id_nguoi_nop], references: [id_nguoi_dung], onDelete: Restrict, onUpdate: Cascade, map: "fk_minh_chung_nguoi_nop")
 
   @@index([id_nguoi_duyet], map: "idx_minh_chung_nguoi_duyet")
   @@index([id_nguoi_nop], map: "idx_minh_chung_nguoi_nop")
@@ -170,8 +170,8 @@ model nguoi_dung {
   hoat_dong                                                            hoat_dong[]
   minh_chung_hoat_dong_minh_chung_hoat_dong_id_nguoi_duyetTonguoi_dung minh_chung_hoat_dong[] @relation("minh_chung_hoat_dong_id_nguoi_duyetTonguoi_dung")
   minh_chung_hoat_dong_minh_chung_hoat_dong_id_nguoi_nopTonguoi_dung   minh_chung_hoat_dong[] @relation("minh_chung_hoat_dong_id_nguoi_nopTonguoi_dung")
-  khoa                                                                 khoa?                  @relation(fields: [id_khoa], references: [id_khoa], map: "fk_nguoi_dung_khoa")
-  vai_tro                                                              vai_tro                @relation(fields: [id_vai_tro], references: [id_vai_tro], map: "fk_nguoi_dung_vai_tro")
+  khoa                                                                 khoa?                  @relation(fields: [id_khoa], references: [id_khoa], onDelete: SetNull, onUpdate: Cascade, map: "fk_nguoi_dung_khoa")
+  vai_tro                                                              vai_tro                @relation(fields: [id_vai_tro], references: [id_vai_tro], onDelete: Restrict, onUpdate: Cascade, map: "fk_nguoi_dung_vai_tro")
   nguoi_nhan_thong_bao                                                 nguoi_nhan_thong_bao[]
   phan_cong_nhiem_vu                                                   phan_cong_nhiem_vu[]
   thong_tin_sinh_trac                                                  thong_tin_sinh_trac?
@@ -185,8 +185,8 @@ model nguoi_nhan_thong_bao {
   id_nguoi_dung Int        @db.UnsignedInt
   da_doc        Boolean    @default(false)
   thoi_gian_doc DateTime?  @db.DateTime(0)
-  nguoi_dung    nguoi_dung @relation(fields: [id_nguoi_dung], references: [id_nguoi_dung], onDelete: Cascade, map: "fk_nguoi_nhan_thong_bao_nguoi_dung")
-  thong_bao     thong_bao  @relation(fields: [id_thong_bao], references: [id_thong_bao], onDelete: Cascade, map: "fk_nguoi_nhan_thong_bao_thong_bao")
+  nguoi_dung    nguoi_dung @relation(fields: [id_nguoi_dung], references: [id_nguoi_dung], onDelete: Cascade, onUpdate: Cascade, map: "fk_nguoi_nhan_thong_bao_nguoi_dung")
+  thong_bao     thong_bao  @relation(fields: [id_thong_bao], references: [id_thong_bao], onDelete: Cascade, onUpdate: Cascade, map: "fk_nguoi_nhan_thong_bao_thong_bao")
 
   @@id([id_thong_bao, id_nguoi_dung])
   @@index([id_nguoi_dung], map: "idx_nguoi_nhan_thong_bao_nguoi_dung")
@@ -202,8 +202,8 @@ model phan_cong_nhiem_vu {
   thoi_gian_bat_dau     DateTime?          @db.DateTime(0)
   thoi_gian_ket_thuc    DateTime?          @db.DateTime(0)
   trang_thai            String             @default("assigned") @db.VarChar(30)
-  chi_tiet_hoat_dong    chi_tiet_hoat_dong @relation(fields: [id_chi_tiet_hoat_dong], references: [id_chi_tiet_hoat_dong], onDelete: Cascade, map: "fk_phan_cong_chi_tiet")
-  nguoi_dung            nguoi_dung         @relation(fields: [id_nguoi_dung], references: [id_nguoi_dung], map: "fk_phan_cong_nguoi_dung")
+  chi_tiet_hoat_dong    chi_tiet_hoat_dong @relation(fields: [id_chi_tiet_hoat_dong], references: [id_chi_tiet_hoat_dong], onDelete: Cascade, onUpdate: Cascade, map: "fk_phan_cong_chi_tiet")
+  nguoi_dung            nguoi_dung         @relation(fields: [id_nguoi_dung], references: [id_nguoi_dung], onDelete: Restrict, onUpdate: Cascade, map: "fk_phan_cong_nguoi_dung")
 
   @@index([id_chi_tiet_hoat_dong], map: "idx_phan_cong_chi_tiet")
   @@index([id_nguoi_dung], map: "idx_phan_cong_nguoi_dung")
@@ -219,10 +219,11 @@ model phien_diem_danh {
   yeu_cau_gps           Boolean             @default(false)
   vi_do                 Decimal?            @db.Decimal(10, 7)
   kinh_do               Decimal?            @db.Decimal(10, 7)
+  /// Don vi: met. Preserve the database column COMMENT in migration SQL.
   ban_kinh_cho_phep     Int?                @db.UnsignedInt
   trang_thai            String              @default("scheduled") @db.VarChar(30)
   ket_qua_diem_danh     ket_qua_diem_danh[]
-  chi_tiet_hoat_dong    chi_tiet_hoat_dong  @relation(fields: [id_chi_tiet_hoat_dong], references: [id_chi_tiet_hoat_dong], onDelete: Cascade, map: "fk_phien_diem_danh_chi_tiet")
+  chi_tiet_hoat_dong    chi_tiet_hoat_dong  @relation(fields: [id_chi_tiet_hoat_dong], references: [id_chi_tiet_hoat_dong], onDelete: Cascade, onUpdate: Cascade, map: "fk_phien_diem_danh_chi_tiet")
 
   @@index([id_chi_tiet_hoat_dong], map: "idx_phien_diem_danh_chi_tiet")
 }
@@ -235,7 +236,7 @@ model thong_bao {
   noi_dung             String                 @db.Text
   thoi_gian_tao        DateTime               @default(now()) @db.DateTime(0)
   nguoi_nhan_thong_bao nguoi_nhan_thong_bao[]
-  hoat_dong            hoat_dong?             @relation(fields: [id_hoat_dong], references: [id_hoat_dong], map: "fk_thong_bao_hoat_dong")
+  hoat_dong            hoat_dong?             @relation(fields: [id_hoat_dong], references: [id_hoat_dong], onDelete: SetNull, onUpdate: Cascade, map: "fk_thong_bao_hoat_dong")
 
   @@index([id_hoat_dong], map: "idx_thong_bao_hoat_dong")
 }
@@ -244,8 +245,10 @@ model thong_tin_sinh_trac {
   id_sinh_trac  Int        @id @default(autoincrement()) @db.UnsignedInt
   id_nguoi_dung Int        @unique(map: "uq_sinh_trac_nguoi_dung") @db.UnsignedInt
   id_khuon_mat  String     @unique(map: "uq_sinh_trac_khuon_mat") @db.VarChar(255)
+  /// Database-managed ON UPDATE CURRENT_TIMESTAMP is preserved in migration SQL.
+  /// Prisma cannot model this clause; preserve it when altering this column.
   ngay_cap_nhat DateTime   @default(now()) @db.DateTime(0)
-  nguoi_dung    nguoi_dung @relation(fields: [id_nguoi_dung], references: [id_nguoi_dung], onDelete: Cascade, map: "fk_sinh_trac_nguoi_dung")
+  nguoi_dung    nguoi_dung @relation(fields: [id_nguoi_dung], references: [id_nguoi_dung], onDelete: Cascade, onUpdate: Cascade, map: "fk_sinh_trac_nguoi_dung")
 }
 
 model vai_tro {
