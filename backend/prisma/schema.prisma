@@ -12,7 +12,7 @@ model bai_dang {
   id_bai_dang    Int        @id @default(autoincrement()) @db.UnsignedInt
   id_nguoi_dang  Int        @db.UnsignedInt
   tieu_de        String     @db.VarChar(255)
-  thoi_gian_dang DateTime   @default(now()) @db.DateTime(0)
+  thoi_gian_dang DateTime? @db.DateTime(0)
   noi_dung       String     @db.Text
   hinh_anh       String?    @db.VarChar(500)
   trang_thai     String     @default("draft") @db.VarChar(30)
@@ -24,7 +24,6 @@ model bai_dang {
 model chi_tiet_hoat_dong {
   id_chi_tiet_hoat_dong Int                  @id @default(autoincrement()) @db.UnsignedInt
   id_hoat_dong          Int                  @unique(map: "uq_chi_tiet_hoat_dong") @db.UnsignedInt
-  id_nguoi_dung         Int?                 @db.UnsignedInt
   thoi_gian_bat_dau     DateTime             @db.DateTime(0)
   thoi_gian_ket_thuc    DateTime             @db.DateTime(0)
   dia_diem              String?              @db.Text
@@ -32,11 +31,9 @@ model chi_tiet_hoat_dong {
   kinh_do               Decimal?             @db.Decimal(10, 7)
   yeu_cau_check_out     Boolean              @default(false)
   hoat_dong             hoat_dong            @relation(fields: [id_hoat_dong], references: [id_hoat_dong], onDelete: Cascade, onUpdate: Cascade, map: "fk_chi_tiet_hoat_dong_hoat_dong")
-  nguoi_dung            nguoi_dung?          @relation(fields: [id_nguoi_dung], references: [id_nguoi_dung], onDelete: SetNull, onUpdate: Cascade, map: "fk_chi_tiet_hoat_dong_nguoi_dung")
   phan_cong_nhiem_vu    phan_cong_nhiem_vu[]
   phien_diem_danh       phien_diem_danh[]
 
-  @@index([id_nguoi_dung], map: "idx_chi_tiet_nguoi_dung")
 }
 
 model dang_ky_hoat_dong {
@@ -164,7 +161,6 @@ model nguoi_dung {
   so_dien_thoai                                                        String?                @db.VarChar(20)
   trang_thai                                                           String                 @default("active") @db.VarChar(30)
   bai_dang                                                             bai_dang[]
-  chi_tiet_hoat_dong                                                   chi_tiet_hoat_dong[]
   dang_ky_hoat_dong                                                    dang_ky_hoat_dong[]
   de_xuat_hoat_dong                                                    de_xuat_hoat_dong[]
   hoat_dong                                                            hoat_dong[]

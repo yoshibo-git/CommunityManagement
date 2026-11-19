@@ -78,7 +78,7 @@ CREATE TABLE IF NOT EXISTS bai_dang (
     id_bai_dang INT UNSIGNED NOT NULL AUTO_INCREMENT,
     id_nguoi_dang INT UNSIGNED NOT NULL,
     tieu_de VARCHAR(255) NOT NULL,
-    thoi_gian_dang DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    thoi_gian_dang DATETIME NULL DEFAULT NULL,
     noi_dung TEXT NOT NULL,
     hinh_anh VARCHAR(500) NULL,
     trang_thai VARCHAR(30) NOT NULL DEFAULT 'draft',
@@ -155,7 +155,6 @@ CREATE TABLE IF NOT EXISTS hoat_dong (
 CREATE TABLE IF NOT EXISTS chi_tiet_hoat_dong (
     id_chi_tiet_hoat_dong INT UNSIGNED NOT NULL AUTO_INCREMENT,
     id_hoat_dong INT UNSIGNED NOT NULL,
-    id_nguoi_dung INT UNSIGNED NULL,
     thoi_gian_bat_dau DATETIME NOT NULL,
     thoi_gian_ket_thuc DATETIME NOT NULL,
     dia_diem TEXT NULL,
@@ -164,13 +163,9 @@ CREATE TABLE IF NOT EXISTS chi_tiet_hoat_dong (
     yeu_cau_check_out BOOLEAN NOT NULL DEFAULT FALSE,
     PRIMARY KEY (id_chi_tiet_hoat_dong),
     UNIQUE KEY uq_chi_tiet_hoat_dong (id_hoat_dong),
-    KEY idx_chi_tiet_nguoi_dung (id_nguoi_dung),
     CONSTRAINT fk_chi_tiet_hoat_dong_hoat_dong
         FOREIGN KEY (id_hoat_dong) REFERENCES hoat_dong (id_hoat_dong)
-        ON UPDATE CASCADE ON DELETE CASCADE,
-    CONSTRAINT fk_chi_tiet_hoat_dong_nguoi_dung
-        FOREIGN KEY (id_nguoi_dung) REFERENCES nguoi_dung (id_nguoi_dung)
-        ON UPDATE CASCADE ON DELETE SET NULL
+        ON UPDATE CASCADE ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
 -- ------------------------------------------------------------

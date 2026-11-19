@@ -1,30 +1,79 @@
-# Environment variables
+# ============================================================
+# CommunityManagement - Root .gitignore
+# NestJS / Prisma / Next.js / TypeScript
+# ============================================================
+
+# Dependencies and package manager caches
+node_modules/
+.pnpm-store/
+.yarn/cache/
+.yarn/unplugged/
+.yarn/build-state.yml
+.yarn/install-state.gz
+
+# Environment variables and local secrets
 .env
 .env.*
 !.env.example
-
-# Dependencies
-node_modules/
+!.env.*.example
+*.pem
+*.key
+*.p12
+*.pfx
 
 # Build output
-dist/
-.next/
-out/
+**/dist/
+**/build/
+**/.next/
+**/out/
+**/.output/
+**/.nuxt/
+**/.vercel/
+**/.turbo/
+**/coverage/
+*.tsbuildinfo
+*.eslintcache
 
-# Generated files
+# Generated Prisma Client (configured in backend/prisma/schema.prisma)
 **/src/generated/
 
-# Logs
+# Runtime logs and temporary files
 *.log
-npm-debug.log*
+logs/
+.tmp/
+tmp/
+temp/
+.cache/
+*.pid
+*.pid.lock
 
-# IDE
-.vscode/
+# Local uploads / private storage
+**/uploads/
+**/storage/private/
+
+# IDE and operating system files
+.vscode/*
+!.vscode/extensions.json
 .idea/
-
-# OS
 .DS_Store
 Thumbs.db
+Desktop.ini
+*.swp
+*.swo
+*~
 
-# TypeScript
-*.tsbuildinfo
+# Local databases and backups (not database/schema.sql)
+*.sqlite
+*.sqlite-journal
+*.sqlite3
+*.db
+*.sql.gz
+*.dump
+
+# Next.js generated type declaration
+**/next-env.d.ts
+
+# Local test artifacts
+playwright-report/
+test-results/
+.nyc_output/
