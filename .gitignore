@@ -4,6 +4,7 @@
 # ============================================================
 
 # Dependencies and package manager caches
+.local/
 node_modules/
 .pnpm-store/
 .yarn/cache/

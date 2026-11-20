@@ -1,7 +1,9 @@
-﻿import 'dotenv/config';
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { PrismaMariaDb } from '@prisma/adapter-mariadb';
-import { PrismaClient } from '../generated/prisma/client';
+import { Prisma, PrismaClient } from '../generated/prisma/client';
+import { readDatabaseConfig } from '../common/config/environment';
+
+export type TransactionContext = Prisma.TransactionClient;
 
 @Injectable()
 export class PrismaService
@@ -10,11 +12,8 @@ export class PrismaService
 {
   constructor() {
     const adapter = new PrismaMariaDb({
-      host: process.env.DB_HOST ?? 'localhost',
-      port: Number(process.env.DB_PORT ?? 3306),
-      user: process.env.DB_USER ?? 'root',
-      password: process.env.DB_PASSWORD ?? '',
-      database: process.env.DB_NAME ?? 'community_management',
+      ...readDatabaseConfig(),
+      timezone: '+00:00',
       connectionLimit: 5,
     });
 
@@ -22,8 +21,20 @@ export class PrismaService
   }
 
   async onModuleInit() {
-    await this.$connect();
-    console.log('Prisma connected to MySQL successfully!');
+    try {
+      await this.$connect();
+      const [connection] = await this.$queryRaw<{ timeZone: string }[]>`SELECT @@session.time_zone AS timeZone`;
+      if (connection.timeZone !== '+00:00') throw new Error('Database connection must use UTC.');
+    } catch {
+      await this.$disconnect();
+      throw new Error('Database connection failed or session timezone is not UTC.');
+    }
+  }
+
+  runInTransaction<T>(work: (tx: TransactionContext) => Promise<T>, tx?: TransactionContext): Promise<T> {
+    return tx ? work(tx) : this.$transaction(work, {
+      isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
+    });
   }
 
   async onModuleDestroy() {

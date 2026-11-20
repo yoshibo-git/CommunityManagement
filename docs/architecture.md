@@ -19,7 +19,7 @@
 
 - Website Next.js responsive và NestJS Modular Monolith, Prisma 7, MySQL 8/InnoDB, Redis, FaceIO, email, private storage.
 - 11 module và 17 bảng được định nghĩa đầy đủ trong chính tài liệu này; không tự thêm bảng/cột/role/workflow.
-- Ba vai trò `Admin`, `Quản lý`, `Người dùng cuối`; `student` và `staff` là loại người dùng, không phải vai trò hệ thống.
+- Ba mã vai trò lưu ở `vai_tro.ten_vai_tro`: `admin` (Admin), `staff` (Quản lý), `user` (Người dùng). `nguoi_dung.loai_nguoi_dung=student|staff` vẫn là loại người dùng độc lập; mã `staff` ở hai trường có nghĩa khác nhau.
 - Không tạo tài khoản tự do; Admin cấp tài khoản. Không ngầm cấp quyền vận hành điểm danh cho Admin.
 
 ### 1.2. Nhật ký quyết định kiến trúc (ADR)
@@ -479,6 +479,8 @@ Một tính năng chỉ hoàn tất khi: (1) truy vết được về §14 (đ�
 
 **Thứ tự triển khai khuyến nghị:** kiểm schema + Prisma/seed → clock/error/transaction/security căn bản → cấp tài khoản và login → activity draft + publish (assignments và NOTI-03) → registration → attendance sessions/proofs → finalize → proposals/evidence → reminders/statistics/posts. Mỗi lát cắt cần hoạt động được trước khi mở rộng tiếp.
 
+**Giai đoạn đăng nhập local đã được phê duyệt (thay thế bản xem trước):** Khách xem News Feed công khai; `user`/`staff` dùng cùng News Feed với header đã đăng nhập. `AUTH_PASSWORD_ONLY=true` chỉ được bật ngoài production: `POST /api/v1/auth/login/password` xác thực mật khẩu Argon2id và cấp cookie phiên HttpOnly, SameSite=Lax, SID ngẫu nhiên lưu Redis, idle TTL 30 phút; không gọi FaceIO. Redis lỗi thì không cấp/duy trì quyền bằng fallback. `GET /auth/session` không gia hạn TTL; truy cập `/system` có hoạt động người dùng mới gia hạn. Mỗi request có quyền đọc kiểm tra lại trạng thái, role, credential fingerprint từ MySQL. `/system` lấy tài khoản từ phiên, không nhận lựa chọn profile hoặc role từ client. Seed local xóa đúng fixture cũ, tạo ba tài khoản `sinhvien1`, `canbo1`, `admin1` tương ứng `user`, `staff`, `admin`; mật khẩu lấy từ biến môi trường, không ghi đè tài khoản hiện có. `/preview/user` và API preview được loại bỏ. API nghiệp vụ chưa triển khai vẫn khóa thao tác; không giả lập thành công. Production tiếp tục yêu cầu giao thức FaceIO chính thức; ngoại lệ này không giải quyết các quyết định `BLOCKED`.
+
 ## 13. Giới hạn đã biết và điều kiện cần xác minh (Verification Gates)
 
 | Gate | Nội dung cần xác minh / phê duyệt | Tác động |
@@ -581,6 +583,8 @@ Các mục UI bên dưới là **hợp đồng hành vi** của hệ thống; k�
 **Biên/lỗi:** địa điểm/giới hạn chưa cấu hình ở draft, link hoạt động đã hủy hoặc đổi trạng thái, load chậm, filter trang rỗng, URL file mất, quota hết chỗ giữa lúc render và đăng ký.
 
 #### 14.3.2. UI-ACT-02 — Tạo/sửa draft và import
+
+**Lát cắt hiện hành đã được phê duyệt:** seed ba hoạt động `draft`, tạo/sửa nháp thật và phân công tạm trong trình duyệt; Công bố giữ khóa đến khi chốt `AUTH-LEADER`, `LEADER-COUNT`, `TASK-TIME-NULL`. Staff dùng chung biểu mẫu tạo/sửa với các mục Thông tin chung, Lịch và địa điểm, Phân công; tải kế hoạch chưa khả dụng. `POST /api/v1/activities` tạo draft, `GET /api/v1/activities/:id/editor` đọc biểu mẫu của chủ sở hữu, `PATCH /api/v1/activities/:id` sửa draft với `revision` SHA-256 để phát hiện ghi đè. PATCH giữ trường bị bỏ qua; ngày null chỉ xóa chi tiết khi không mất phân công/phiên và dữ liệu lịch liên quan đã được bỏ rõ ràng. API khóa actor rồi activity, kiểm lại session credential fingerprint/role/state trong transaction; không ghi assignment từ DTO. API sửa nháp từ chối mọi trạng thái đã công bố hoặc đã diễn ra. `GET /api/v1/activities/assignees?search=` chỉ trả mã, tên đăng nhập, họ tên của account active để gợi ý tạm, không quyết định điều kiện publish.
 
 **UI:** form nhiều phần hoặc tabs `Thông tin chung`, `Lịch & Địa điểm`, `Kế hoạch`, `Nhiệm vụ BTC`, `Xem trước`. Trường: tên hoạt động; mô tả; thời gian bắt đầu/kết thúc; địa điểm; vĩ độ/kinh độ và lựa chọn vị trí bản đồ; giới hạn đăng ký; điểm; bật Checkout; kế hoạch PDF/Excel hoặc liên kết đề xuất đã duyệt. Nút `Lưu nháp` chỉ yêu cầu tên; `Công bố` yêu cầu dữ liệu đầy đủ. Import Excel/PDF có preview/edit và validation trước khi lưu. Thông báo `Chưa lưu` khi rời trang có thay đổi.
 
@@ -780,7 +784,7 @@ Các mục UI bên dưới là **hợp đồng hành vi** của hệ thống; k�
 
 #### 14.11.2. UI-POST-02 — News Feed công khai
 
-**UI:** layout một cột giống feed, bài hiện tên tác giả, tiêu đề, Rich Text trực tiếp, ảnh nếu có, một dòng thời gian (`Đăng lúc ...` hoặc `Được chỉnh sửa lúc ...`), `Xem thêm` inline. Tìm theo tiêu đề, **10 bài tải đầu**, infinite scroll 10/lần; spinner `Đang tải...`, lỗi `Không thể tải bài viết – Thử lại`, cuối `Bạn đã xem hết bài viết`. Không có like/comment/share nội bộ; khách chưa login vẫn đọc published.
+**UI:** homepage chia Tin tức bên trái và Hoạt động bên phải thành hai cột bằng nhau, stack trên mobile. Tin tức không có ô tìm kiếm; danh sách cuộn với **10 bài tải đầu**, infinite scroll 10/lần. Bài hiện tên tác giả, tiêu đề, Rich Text trực tiếp, ảnh nếu có, một dòng thời gian (`Đăng lúc ...` hoặc `Được chỉnh sửa lúc ...`), `Xem thêm` inline; spinner `Đang tải...`, lỗi `Không thể tải bài viết – Thử lại`, cuối `Bạn đã xem hết bài viết`. Không có like/comment/share nội bộ; khách chưa login vẫn đọc published. Menu tài khoản gồm Hồ sơ, Hoạt động (user/staff) hoặc Quản lý tài khoản (admin), Đăng xuất. Các màn dùng chung header/footer public. User có ba mục Hoạt động/Kết quả tham gia/Minh chứng; staff có Hoạt động/Danh sách hoạt động đã công bố/Minh chứng để duyệt. API duyệt chưa được triển khai thì thao tác vẫn khóa, không giả lập danh sách hay kết quả. Liên kết và giao diện đề xuất chỉ dành cho khách, tài khoản đã đăng nhập mở `/proposals` được chuyển về `/`.
 
 **Server-side:** public chỉ query `published`, sort `thoi_gian_dang DESC, id_bai_dang DESC` theo mốc publish lần đầu (không đẩy bài sửa/republish lên đầu), stable cursor; sanitize output, không lộ draft/hidden qua ID; URL trong bài dẫn tới đích và guard ở đích. Không cần realtime/WebSocket.
 

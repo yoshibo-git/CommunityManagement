@@ -5,7 +5,7 @@ export class AppController {
   @Get()
   getHello() {
     return {
-      message: 'Community Management API is running!',
+      message: 'API Quản lý hoạt động cộng đồng đang hoạt động.',
       status: 'success',
     };
   }
