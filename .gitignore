@@ -78,3 +78,6 @@ Desktop.ini
 playwright-report/
 test-results/
 .nyc_output/
+
+# AI agent local skills
+.agents/

@@ -11,7 +11,9 @@ export default async function SystemPage({ searchParams }: { searchParams: Promi
   const headers = await sessionHeaders();
   if (!headers.Cookie) redirect('/login');
   let response: Response;
-  try { response = await fetch(backendUrl('system/workspace'), { headers: { ...headers, 'X-User-Activity': '1' }, cache: 'no-store', signal: AbortSignal.timeout(10000) }); }
+  const workspaceUrl = backendUrl('system/workspace');
+  workspaceUrl.searchParams.set('includeAccounts', 'false');
+  try { response = await fetch(workspaceUrl, { headers: { ...headers, 'X-User-Activity': '1' }, cache: 'no-store', signal: AbortSignal.timeout(10000) }); }
   catch { return <div className="container not-found"><h1>Không thể tải dữ liệu</h1><p role="alert">Dịch vụ tạm thời không khả dụng.</p></div>; }
   if (response.status === 401) redirect('/login');
   if (!response.ok) return <div className="container not-found"><h1>Không thể tải dữ liệu</h1><p role="alert">Dịch vụ tạm thời không khả dụng.</p></div>;

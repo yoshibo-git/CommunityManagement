@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from './icon';
+import { ActivityMedia } from './activity-media';
+import { activityStatusLabel } from '@/lib/workspace';
 
 type Post = { id: number; title: string; html: string; author: string; publishedAt: string; editedAt: string | null };
 const formatDate = (value: string) => new Intl.DateTimeFormat('vi-VN', { dateStyle: 'medium', timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(value));
@@ -61,7 +63,7 @@ export function NewsFeed() {
 }
 
 export function PublicActivities() {
-  const [items, setItems] = useState<{ id: number; name: string; location: string | null; startAt: string | null }[] | null>(null);
+  const [items, setItems] = useState<{ id: number; name: string; status?: string; imageUrl?: string | null; location: string | null; startAt: string | null }[] | null>(null);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
     const controller = new AbortController();
@@ -73,6 +75,6 @@ export function PublicActivities() {
   }, []);
   if (failed) return <div className="surface workspace-empty" role="alert">Không thể tải hoạt động. Vui lòng tải lại trang.</div>;
   if (!items) return <p role="status">Đang tải hoạt động…</p>;
-  return items.length ? <div className="workspace-card-grid">{items.map((item) => <article key={item.id} className="surface activity-card"><h3>{item.name}</h3><p>{item.startAt ? formatDate(item.startAt) : 'Chưa có lịch'}</p><p>{item.location}</p></article>)}</div> : <div className="surface workspace-empty"><Icon name="calendar" /><h3>Chưa có hoạt động công khai</h3></div>;
+  return items.length ? <div className="workspace-card-grid">{items.map((item) => <article key={item.id} className="surface activity-card"><ActivityMedia src={item.imageUrl} /><h3>{item.name}</h3>{item.status && <div><span className="status-label">{activityStatusLabel(item.status)}</span></div>}<p>{item.startAt ? formatDate(item.startAt) : 'Chưa có lịch'}</p><p>{item.location}</p></article>)}</div> : <div className="surface workspace-empty"><Icon name="calendar" /><h3>Chưa có hoạt động công khai</h3></div>;
 }
 

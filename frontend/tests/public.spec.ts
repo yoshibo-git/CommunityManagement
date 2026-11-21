@@ -1,5 +1,12 @@
 import { expect, test } from '@playwright/test';
 
+test('forgot password shows the shared maintenance toast', async ({ page }) => {
+  await page.goto('/login');
+  await page.getByRole('button', { name: 'Quên mật khẩu?' }).click();
+  await expect(page.getByRole('list', { name: 'Thông báo thao tác' })).toContainText('Hệ thống đang cập nhật. Vui lòng thử lại sau.');
+  await expect(page).toHaveURL('/login');
+});
+
 const widths = [320, 375, 390, 768, 1024, 1280, 1440];
 const pages = [
   { path: '/', title: 'Cùng hành động.', name: 'home' },
@@ -33,12 +40,19 @@ for (const route of pages) {
 }
 
 test('header links navigate to login and proposals on desktop', async ({ page }) => {
+  const sessionRequests: string[] = [];
+  page.on('request', (request) => {
+    if (new URL(request.url()).pathname === '/api/backend/auth/session') sessionRequests.push(request.url());
+  });
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/');
   await page.getByRole('banner').getByRole('link', { name: 'Đăng nhập', exact: true }).click();
   await expect(page).toHaveURL('/login');
   await page.getByRole('banner').getByRole('link', { name: 'Đề xuất hoạt động', exact: true }).click();
   await expect(page).toHaveURL('/proposals');
+  await page.goto('/system');
+  await expect(page).toHaveURL('/login');
+  expect(sessionRequests).toEqual([]);
 });
 
 test('mobile menu traps focus, closes on Escape and navigation, and preserves form input', async ({ page }) => {
@@ -105,7 +119,7 @@ test('proposal form contains all documented fields and does not submit unavailab
   await page.getByLabel('Tên hoạt động').fill('Hoạt động cộng đồng');
   await page.getByLabel('Tôi xác nhận').check();
   await expect(page.getByRole('button', { name: 'Gửi đề xuất', exact: true })).toBeDisabled();
-  await expect(page.getByRole('status')).toContainText('chưa được gửi hoặc lưu lại');
+  await expect(page.getByRole('form', { name: 'Đề xuất hoạt động' }).getByRole('status')).toContainText('chưa được gửi hoặc lưu lại');
 });
 
 test('keyboard skip link, reduced motion and narrow reflow remain usable', async ({ page }) => {

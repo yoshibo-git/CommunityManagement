@@ -8,10 +8,12 @@ import { WorkspaceService } from './modules/system/workspace.service';
 import { PublicContentService } from './modules/system/public-content.service';
 import { ActivitiesController } from './modules/activities/activities.controller';
 import { ActivitiesService } from './modules/activities/activities.service';
+import { AccountsController } from './modules/users/accounts.controller';
+import { AccountsService } from './modules/users/accounts.service';
 
 @Module({
   imports: [],
-  controllers: [AppController, AuthController, SystemController, ActivitiesController],
-  providers: [PrismaService, AuthService, SessionGuard, WorkspaceService, PublicContentService, ActivitiesService],
+  controllers: [AppController, AuthController, SystemController, ActivitiesController, AccountsController],
+  providers: [PrismaService, AuthService, SessionGuard, WorkspaceService, PublicContentService, ActivitiesService, AccountsService],
 })
 export class AppModule {}

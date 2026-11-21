@@ -1,0 +1,1 @@
+ALTER TABLE `hoat_dong` ADD COLUMN `hinh_anh` VARCHAR(500) NULL;

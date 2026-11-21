@@ -127,10 +127,10 @@ function MapCanvas({ latitude, longitude, disabled, onChange, target }: Props & 
       <button type="button" className="button button-primary" disabled={disabled || !ready || locating} onClick={() => {
         const point = map.current?.getCenter().wrap();
         if (!point || !validPoint(point.lat, point.lng)) { setError('Vị trí không hợp lệ.'); return; }
-        onChange({ lat: point.lat, lng: point.lng }); setError(''); setMessage('Đã ghim vị trí. Lưu nháp để ghi nhận thay đổi.');
+        onChange({ lat: point.lat, lng: point.lng }); setError(''); setMessage('Đã ghim vị trí. Chọn Nháp để lưu thay đổi.');
       }}><Icon name="location" />Ghim vị trí</button>
       <button type="button" className="button button-outline" disabled={disabled || !ready || locating} onClick={locate}>{locating ? 'Đang định vị…' : 'Vị trí hiện tại'}</button>
-      {validPoint(latitude, longitude) && <button type="button" className="text-button" disabled={disabled} onClick={() => { onChange(null); setMessage('Đã bỏ ghim. Lưu nháp để ghi nhận thay đổi.'); }}>Bỏ ghim</button>}
+      {validPoint(latitude, longitude) && <button type="button" className="text-button" disabled={disabled} onClick={() => { onChange(null); setMessage('Đã bỏ ghim. Chọn Nháp để lưu thay đổi.'); }}>Bỏ ghim</button>}
       {!ready && error && <button type="button" className="button button-outline" onClick={() => { setError(''); setAttempt((value) => value + 1); }}>Thử lại</button>}
     </div>
   </div>;

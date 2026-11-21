@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useToast } from './toast';
 
 function cameraError(error: unknown) {
   if (error instanceof DOMException) {
@@ -23,7 +24,7 @@ export function FaceEnrollment({ ticket, purpose, onComplete, onCancel }: {
   const [opening, setOpening] = useState(0);
   const [pending, setPending] = useState(false);
   const [expired, setExpired] = useState(false);
-  const [error, setError] = useState('');
+  const toast = useToast();
   const [registered, setRegistered] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
   const enrolling = purpose === 'enroll';
@@ -39,6 +40,12 @@ export function FaceEnrollment({ ticket, purpose, onComplete, onCancel }: {
     }, 300_000);
     return () => window.clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    if (expired && !registered) {
+      toast('error', `${enrolling ? 'Phiên đăng ký' : 'Phiên xác thực'} đã hết hạn hoặc hết lượt thử. Vui lòng đăng nhập lại.`);
+    }
+  }, [enrolling, expired, registered, toast]);
 
   useEffect(() => {
     if (!opening) return;
@@ -60,7 +67,7 @@ export function FaceEnrollment({ ticket, purpose, onComplete, onCancel }: {
       } catch (cause) {
         stream?.getTracks().forEach((track) => track.stop());
         if (active) {
-          setError(navigator.mediaDevices ? cameraError(cause) : 'Hãy mở trang qua localhost hoặc HTTPS để dùng camera.');
+          toast('error', navigator.mediaDevices ? cameraError(cause) : 'Hãy mở trang qua localhost hoặc HTTPS để dùng camera.');
           setCamera('error');
         }
       }
@@ -70,13 +77,12 @@ export function FaceEnrollment({ ticket, purpose, onComplete, onCancel }: {
       stream?.getTracks().forEach((track) => track.stop());
       preview.srcObject = null;
     };
-  }, [opening]);
+  }, [opening, toast]);
 
   async function capture() {
     const preview = video.current;
     if (!preview?.videoWidth || pending || expired) return;
     setPending(true);
-    setError('');
     try {
       const canvas = document.createElement('canvas');
       const scale = Math.min(1, 1280 / Math.max(preview.videoWidth, preview.videoHeight));
@@ -100,7 +106,7 @@ export function FaceEnrollment({ ticket, purpose, onComplete, onCancel }: {
           return;
         }
         const payload = await response.json() as { message?: string };
-        setError(payload.message ?? 'Không thể xử lý ảnh khuôn mặt.');
+        toast('error', payload.message ?? 'Không thể xử lý ảnh khuôn mặt.');
         return;
       }
       if (enrolling) {
@@ -115,14 +121,15 @@ export function FaceEnrollment({ ticket, purpose, onComplete, onCancel }: {
         setOpening(0);
       }
     } catch {
-      setError(enrolling ? 'Không thể xác nhận đã lưu mẫu khuôn mặt. Vui lòng thử lại.' : 'Không thể xác nhận phiên đăng nhập. Vui lòng thử lại.');
+      toast('error', enrolling ? 'Không thể xác nhận đã lưu mẫu khuôn mặt. Vui lòng thử lại.' : 'Không thể xác nhận phiên đăng nhập. Vui lòng thử lại.');
     } finally {
       setPending(false);
     }
   }
 
-  if (registered) return <div className="auth-card surface">
+  if (registered) return <div className="auth-card surface face-scan">
     <h1>Đăng ký khuôn mặt</h1>
+    <p className="page-description">Đăng ký khuôn mặt thành công. Đăng nhập ngay.</p>
     <dialog ref={confirmation} className="surface face-guide" aria-labelledby="face-enrollment-success" onCancel={(event) => event.preventDefault()}>
       <h2 id="face-enrollment-success">Đăng ký khuôn mặt thành công!</h2>
       <p>Bạn đã đăng ký Face ID thành công. Vui lòng quay lại trang đăng nhập để xác thực khuôn mặt và truy cập hệ thống.</p>
@@ -133,7 +140,7 @@ export function FaceEnrollment({ ticket, purpose, onComplete, onCancel }: {
         }}>Đồng ý</button>
       </div>
     </dialog>
-    {acknowledged && <button type="button" className="button button-primary" onClick={onCancel}>Quay lại đăng nhập</button>}
+    {acknowledged && <div><button type="button" className="button button-primary" onClick={onCancel}>Quay lại đăng nhập</button></div>}
   </div>;
 
   return <div className="auth-card surface face-scan">
@@ -143,14 +150,11 @@ export function FaceEnrollment({ ticket, purpose, onComplete, onCancel }: {
       <video ref={video} muted playsInline aria-label="Hình ảnh xem trước từ camera" aria-describedby="face-scan-guide" />
     </div>
     {camera === 'loading' && !expired && <p role="status">Đang chờ quyền truy cập camera…</p>}
-    {expired && <p className="form-error" role="alert">{enrolling ? 'Phiên đăng ký' : 'Phiên xác thực'} đã hết hạn hoặc hết lượt thử. Vui lòng đăng nhập lại.</p>}
-    {error && !expired && <p className="form-error" role="alert">{error}</p>}
     <div className="face-guide-actions">
       <button className="button button-outline" type="button" disabled={pending} onClick={onCancel}>Quay về đăng nhập</button>
       {!expired && (camera === 'ready'
         ? <button className="button button-primary" type="button" disabled={pending} onClick={() => void capture()}>{pending ? 'Đang xử lý…' : enrolling ? 'Chụp và đăng ký' : 'Chụp và xác thực'}</button>
         : <button className="button button-primary" type="button" disabled={camera === 'loading'} onClick={() => {
-          setError('');
           setCamera('loading');
           setOpening((value) => value + 1);
         }}>{camera === 'error' ? 'Thử mở lại camera' : 'Mở camera'}</button>)}

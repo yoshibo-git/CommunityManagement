@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { activityImageUrl } from '../activities/activity-image';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuthService, Principal } from '../auth/auth.service';
 
@@ -23,19 +24,20 @@ export class WorkspaceService {
     return rows.map((row) => ({ id: row.thong_bao.id_thong_bao, title: row.thong_bao.tieu_de, content: row.thong_bao.noi_dung, createdAt: row.thong_bao.thoi_gian_tao.toISOString(), read: row.da_doc }));
   }
 
-  async read(user: Principal) {
+  async read(user: Principal, includeAccounts = true) {
     const records = await this.prisma.hoat_dong.findMany({
       where: { OR: [{ trang_thai: { in: ['published', 'pending', 'progress', 'pending_completed', 'pending_issues', 'completed', 'cancelled', 'issues'] } }, ...(user.role === 'staff' ? [{ id_nguoi_tao: user.id }] : [])] },
       orderBy: { id_hoat_dong: 'asc' },
       select: {
-        id_hoat_dong: true, id_nguoi_tao: true, ten_hoat_dong: true, mo_ta: true, trang_thai: true, gioi_han_dang_ky: true, diem_hoat_dong: true,
+        id_hoat_dong: true, id_nguoi_tao: true, ten_hoat_dong: true, mo_ta: true, trang_thai: true, gioi_han_dang_ky: true, diem_hoat_dong: true, hinh_anh: true,
         _count: { select: { dang_ky_hoat_dong: true } },
         dang_ky_hoat_dong: { where: { id_nguoi_dung: user.id }, select: { trang_thai: true } },
         chi_tiet_hoat_dong: { select: {
-          thoi_gian_bat_dau: true, thoi_gian_ket_thuc: true, dia_diem: true, yeu_cau_check_out: true,
+          thoi_gian_bat_dau: true, thoi_gian_ket_thuc: true, dia_diem: true, ghi_chu_dia_diem: true, yeu_cau_check_out: true,
           phien_diem_danh: { select: { loai_diem_danh: true, trang_thai: true, thoi_gian_bat_dau: true, thoi_gian_ket_thuc: true } },
-          phan_cong_nhiem_vu: { where: { id_nguoi_dung: user.id }, select: {
-            id_phan_cong: true, ten_nhiem_vu: true, trang_thai: true, thoi_gian_bat_dau: true, thoi_gian_ket_thuc: true,
+          phan_cong_nhiem_vu: { where: { OR: [{ id_nguoi_dung: user.id }, ...(user.role === 'staff' ? [{ chi_tiet_hoat_dong: { hoat_dong: { id_nguoi_tao: user.id } } }] : [])] }, select: {
+            id_phan_cong: true, id_nguoi_dung: true, ten_nhiem_vu: true, loai_nhiem_vu: true, trang_thai: true,
+            thoi_gian_bat_dau: true, thoi_gian_ket_thuc: true, nguoi_dung: { select: { ho_ten: true } },
           } },
         } },
       },
@@ -52,12 +54,13 @@ export class WorkspaceService {
     return {
       serverTime: new Date().toISOString(),
       user,
-      accounts: user.role === 'admin' ? await this.prisma.nguoi_dung.findMany({ select: { id_nguoi_dung: true, ten_dang_nhap: true, ho_ten: true, email: true, trang_thai: true, vai_tro: { select: { ten_vai_tro: true } } }, orderBy: { id_nguoi_dung: 'asc' } }) : [],
+      accounts: includeAccounts && user.role === 'admin' ? await this.prisma.nguoi_dung.findMany({ select: { id_nguoi_dung: true, ten_dang_nhap: true, ho_ten: true, email: true, trang_thai: true, vai_tro: { select: { ten_vai_tro: true } } }, orderBy: { id_nguoi_dung: 'asc' } }) : [],
       activities: records.map((row) => ({
+        imageUrl: activityImageUrl(row.id_hoat_dong, row.hinh_anh),
         id: row.id_hoat_dong, name: row.ten_hoat_dong, status: row.trang_thai, ownerId: user.role === 'staff' ? row.id_nguoi_tao : undefined, description: row.mo_ta,
         startAt: row.chi_tiet_hoat_dong?.thoi_gian_bat_dau.toISOString() ?? null,
         endAt: row.chi_tiet_hoat_dong?.thoi_gian_ket_thuc.toISOString() ?? null,
-        location: row.chi_tiet_hoat_dong?.dia_diem, requiresCheckout: row.chi_tiet_hoat_dong?.yeu_cau_check_out ?? false,
+        location: row.chi_tiet_hoat_dong?.dia_diem, locationNote: row.chi_tiet_hoat_dong?.ghi_chu_dia_diem, requiresCheckout: row.chi_tiet_hoat_dong?.yeu_cau_check_out ?? false,
         capacity: row.gioi_han_dang_ky, registrations: row._count.dang_ky_hoat_dong,
         points: row.diem_hoat_dong, registrationStatus: row.dang_ky_hoat_dong[0]?.trang_thai ?? null,
         awardedPoints: row.trang_thai === 'completed' && row.dang_ky_hoat_dong[0]?.trang_thai === 'completed' ? row.diem_hoat_dong : 0,
@@ -65,7 +68,10 @@ export class WorkspaceService {
           type: session.loai_diem_danh, status: session.trang_thai,
           startAt: session.thoi_gian_bat_dau.toISOString(), endAt: session.thoi_gian_ket_thuc.toISOString(),
         })) ?? [],
-        tasks: row.chi_tiet_hoat_dong?.phan_cong_nhiem_vu.map((task) => ({
+        assignments: row.chi_tiet_hoat_dong?.phan_cong_nhiem_vu.map((task) => ({
+          id: task.id_phan_cong, name: task.ten_nhiem_vu, type: task.loai_nhiem_vu, assignee: task.nguoi_dung.ho_ten, status: task.trang_thai,
+        })) ?? [],
+        tasks: row.chi_tiet_hoat_dong?.phan_cong_nhiem_vu.filter((task) => task.id_nguoi_dung === user.id).map((task) => ({
           id: task.id_phan_cong, name: task.ten_nhiem_vu, status: task.trang_thai,
           startAt: task.thoi_gian_bat_dau?.toISOString() ?? null, endAt: task.thoi_gian_ket_thuc?.toISOString() ?? null,
         })) ?? [],

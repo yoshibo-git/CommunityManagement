@@ -537,6 +537,8 @@ Các mục UI bên dưới là **hợp đồng hành vi** của hệ thống; k�
 
 #### 14.2.1. UI-ACC-01 — Tạo/import tài khoản (Admin)
 
+**Ngoại lệ cấp tài khoản local:** Chỉ trong development với `AUTH_PASSWORD_ONLY=true`, Admin có thể tạo hoặc nhập tài khoản `user` và `staff` với mật khẩu tạm do Admin cung cấp, lưu bằng Argon2id và chưa gửi email kích hoạt. `user` được cấp loại `student` ở trạng thái `pending_faceio`, yêu cầu `FACE_ENROLLMENT_DEMO=true` và chỉ chuyển `active` trong cùng transaction lưu mẫu khuôn mặt. Bước đăng ký không cấp phiên, lần đăng nhập tiếp theo vẫn xác minh khuôn mặt theo luồng demo. `staff` được cấp loại `staff` ở trạng thái `active`. Danh sách quản trị local tìm kiếm và lọc theo vai trò, tải tiếp 10 tài khoản khi cuộn. Import local kiểm tra trước theo từng dòng, nhận Excel .xlsx hoặc PDF có bảng văn bản và ghi cả lô khi xác nhận. Quy tắc kích hoạt qua email bên dưới tiếp tục áp dụng ngoài ngoại lệ local.
+
 **UI:** Tab `Tài khoản` có tìm theo mã/họ tên/email, lọc vai trò/trạng thái/loại người dùng/khoa, danh sách 10/trang; nút `Tạo tài khoản`, `Nhập Excel/PDF`, `Xem chi tiết`. Form gồm mã đăng nhập, họ tên, email, số điện thoại (nếu có), khoa, loại người dùng; không có form tự đăng ký hoặc nhập mật khẩu mặc định. Import theo hai bước: tải tệp → preview từng dòng (hợp lệ/lỗi, chỉnh trực tiếp) → `Xác nhận nhập`. Hiển thị kết quả theo số dòng thành công/lỗi và khả năng gửi lại email kích hoạt.
 
 **Server-side:** Admin guard → parse/validate giới hạn tệp, định dạng, mã/email UNIQUE, loại người dùng và vai trò mặc định End User → transaction tạo tài khoản `pending_activation`, `mat_khau` là Argon2id hash của secret ngẫu nhiên không thể đăng nhập; không dựa `DEFAULT active` của SQL → email activation qua adapter sau DB commit với token opaque digest Redis TTL 24 giờ. Import phải tránh commit từng dòng khi đang ở chế độ yêu cầu sửa hết dòng lỗi. Gửi mail lỗi không xóa user; hỗ trợ gửi lại link; sửa email của pending_activation vô hiệu liên kết cũ.
@@ -580,6 +582,20 @@ Các mục UI bên dưới là **hợp đồng hành vi** của hệ thống; k�
 
 #### 14.3.1. UI-ACT-01 — Danh sách và chi tiết hoạt động
 
+**Chốt nghiệp vụ ngày 22/11/2026:** Khi lưu nháp, tối đa một Trưởng BTC và người đó phải là Staff active. Khi công bố, bắt buộc đúng một Trưởng BTC hợp lệ. Không nhận hoặc lập thời gian riêng cho nhiệm vụ mới; kiểm tra trùng theo lịch hoạt động, cột giờ nhiệm vụ cũ giữ nguyên. POST/PATCH hoạt động nhận `publish=true` để kiểm tra lịch, vị trí, kế hoạch và assignee rồi lưu nhiệm vụ, trạng thái và NOTI-03 trong cùng transaction. Staff sở hữu hoạt động có thể đánh dấu nhiệm vụ hoàn thành qua `POST /api/v1/activities/:id/tasks/:taskId/complete`. Trạng thái hiển thị nhị phân dùng trạng thái hiện có. Đặc tả này thay thế các điều kiện chặn công bố dựa trên AUTH-LEADER, LEADER-COUNT và TASK-TIME-NULL ở các phần cũ.
+
+**Ghi chú và tệp:** `chi_tiet_hoat_dong.ghi_chu_dia_diem` là TEXT nullable, API dùng `locationNote`. Giới hạn ảnh là 10 MiB, kế hoạch giữ 5 MiB. Cờ `removeImage` và `removePlan` cập nhật tham chiếu trong transaction; chỉ dọn tệp cũ sau commit.
+
+**Giao diện quản lý:** Danh sách hiển thị theo chiều dọc, có khung ảnh minh họa và nút `Xem`. Chi tiết gồm `Thông tin chung` và `Phân công`, trạng thái đặt cuối phần thông tin. Chỉnh sửa nháp từ chi tiết dành cho Quản lý sở hữu nháp. Màn Minh chứng vẫn truy cập từ danh sách.
+
+**Ảnh minh họa:** Quản lý sở hữu bản nháp có thể chọn hoặc thay một ảnh JPG, PNG hoặc WebP tối đa 5 MiB khi lưu nháp. POST/PATCH tiếp tục nhận JSON và nhận thêm multipart với phần `draft` chứa JSON và phần `image` chứa ảnh. `hoat_dong.hinh_anh` lưu khóa tệp tại thư mục riêng `ACTIVITY_IMAGE_DIR` (mặc định `storage/private/activities` dưới backend). `GET /api/v1/activities/:id/image` kiểm quyền theo khả năng xem hoạt động. Ảnh mới được ghi trước transaction, tham chiếu được đổi cùng bản nháp và ảnh cũ được dọn sau commit.
+
+**Lưu nháp và Trưởng BTC:** Thao tác `Nháp` lưu hoạt động và lưu phân công trên trình duyệt bằng khóa hiện có. API POST/PATCH nhận thêm trường tùy chọn `assignmentTypes` để từ chối bản nháp gửi lên có hơn một nhiệm vụ Trưởng BTC. Trường này không ghi nhiệm vụ vào MySQL. Giới hạn này cho phép 0 hoặc 1 Trưởng BTC trong bản nháp và không mở công bố hoặc cấp quyền operator.
+
+**Xóa bản nháp:** `DELETE /api/v1/activities/:id` chỉ dành cho Quản lý sở hữu bản nháp. Backend khóa bản ghi và kiểm tra trạng thái, đề xuất, kế hoạch, đăng ký, thông báo, nhiệm vụ và phiên điểm danh trong transaction trước khi xóa. Giao diện yêu cầu xác nhận và chặn xóa nếu thiết bị còn lưu phân công cho bản nháp.
+
+**Bổ sung quản lý hoạt động Staff:** Trang chủ chỉ lấy `published`, `pending`, `progress`. Bản nháp hỗ trợ tệp kế hoạch PDF/XLS/XLSX tối đa 5 MiB qua multipart `plan`, lưu khóa tại `ke_hoach_hoat_dong`; `GET /api/v1/activities/:id/plan` tải tệp cho Quản lý sở hữu. `removeImage` xóa tham chiếu ảnh khi lưu nháp và dọn tệp sau commit. Bản nháp có thể gửi `assignments` để kiểm tra tên, người phụ trách, thời gian và giới hạn Trưởng BTC trước khi lưu trên trình duyệt. Với hoạt động sở hữu ở `published` còn trước hạn ngừng đăng ký, Staff có thể sửa tên/mô tả qua `PATCH /api/v1/activities/:id/published-details` hoặc hủy với lý do qua `POST /api/v1/activities/:id/cancel`. Lưu thay đổi tên và hủy ghi thông báo cho đúng người nhận trong cùng transaction. Luồng này giữ nguyên phân công, đăng ký và lịch.
+
 **UI:** Public có danh sách hoạt động công khai, tìm theo tên, lọc theo giai đoạn/điều kiện phù hợp, card tên, thời gian, địa điểm, số chỗ còn lại (nếu giới hạn), trạng thái đăng ký và nút xem chi tiết. Quản lý có danh sách riêng gồm cả `draft`, toolbar `Tạo hoạt động`, `Nhập từ Excel/PDF`; lọc/trang 10 mục, action theo trạng thái. Chi tiết gồm mô tả, lịch, địa điểm, GPS trên bản đồ nếu dữ liệu có, giới hạn, điểm, checkout bắt buộc, file kế hoạch, số đăng ký; BTC và danh sách nhiệm vụ **không công khai**.
 
 **Server-side:** public query chỉ hoạt động công khai/hợp lệ theo các quy tắc trong tài liệu này, không lộ bản nháp; user management query có role guard. Lấy chỗ bằng số bản ghi đăng ký thực (không counter mới); trả trạng thái/cutoff tính từ BusinessClock. File private chỉ qua endpoint có quyền/đường dẫn ký nếu adapter hỗ trợ; không trả local filesystem path như URL tự do. Khi resource ẩn/chưa công bố, public nhận 404/403 phù hợp contract.
@@ -590,7 +606,7 @@ Các mục UI bên dưới là **hợp đồng hành vi** của hệ thống; k�
 
 **Lát cắt hiện hành đã được phê duyệt:** seed ba hoạt động `draft`, tạo/sửa nháp thật và phân công tạm trong trình duyệt; Công bố giữ khóa đến khi chốt `AUTH-LEADER`, `LEADER-COUNT`, `TASK-TIME-NULL`. Staff dùng chung biểu mẫu tạo/sửa với các mục Thông tin chung, Lịch và địa điểm, Phân công; tải kế hoạch chưa khả dụng. `POST /api/v1/activities` tạo draft, `GET /api/v1/activities/:id/editor` đọc biểu mẫu của chủ sở hữu, `PATCH /api/v1/activities/:id` sửa draft với `revision` SHA-256 để phát hiện ghi đè. PATCH giữ trường bị bỏ qua; ngày null chỉ xóa chi tiết khi không mất phân công/phiên và dữ liệu lịch liên quan đã được bỏ rõ ràng. API khóa actor rồi activity, kiểm lại session credential fingerprint/role/state trong transaction; không ghi assignment từ DTO. API sửa nháp từ chối mọi trạng thái đã công bố hoặc đã diễn ra. `GET /api/v1/activities/assignees?search=` chỉ trả mã, tên đăng nhập, họ tên của account active để gợi ý tạm, không quyết định điều kiện publish.
 
-**UI:** form nhiều phần hoặc tabs `Thông tin chung`, `Lịch & Địa điểm`, `Kế hoạch`, `Nhiệm vụ BTC`, `Xem trước`. Trường: tên hoạt động; mô tả; thời gian bắt đầu/kết thúc; địa điểm; vĩ độ/kinh độ và lựa chọn vị trí bản đồ; giới hạn đăng ký; điểm; bật Checkout; kế hoạch PDF/Excel hoặc liên kết đề xuất đã duyệt. Nút `Lưu nháp` chỉ yêu cầu tên; `Công bố` yêu cầu dữ liệu đầy đủ. Import Excel/PDF có preview/edit và validation trước khi lưu. Thông báo `Chưa lưu` khi rời trang có thay đổi.
+**UI:** form nhiều phần hoặc tabs `Thông tin chung`, `Lịch & Địa điểm`, `Kế hoạch`, `Nhiệm vụ BTC`, `Xem trước`. Trường: tên hoạt động; mô tả; thời gian bắt đầu/kết thúc; địa điểm; vĩ độ/kinh độ và lựa chọn vị trí bản đồ; giới hạn đăng ký; điểm; bật Checkout; kế hoạch PDF/Excel hoặc liên kết đề xuất đã duyệt. Nút `Nháp` chỉ yêu cầu tên; `Công bố` yêu cầu dữ liệu đầy đủ. Import Excel/PDF có preview/edit và validation trước khi lưu. Thông báo `Chưa lưu` khi rời trang có thay đổi.
 
 **Server-side:** tạo activity `draft` trong `hoat_dong`, chi tiết `chi_tiet_hoat_dong` chỉ khi đủ trường tối thiểu cần tạo; không lưu assignment trong DB khi draft. Ghi `id_nguoi_tao` từ session; giữ `id_de_xuat`/`id_don_vi` hợp lệ. Upload ngoài transaction; kiểm MIME/extension/signature/path; rollback DB → cleanup file mới best effort. Chỉ Manager có quyền sửa draft; kiểm trạng thái tại điểm ghi. Dữ liệu datetime API UTC, hiện giờ VN ở UI; trích xuất import là preview không bypass validation.
 
@@ -598,7 +614,7 @@ Các mục UI bên dưới là **hợp đồng hành vi** của hệ thống; k�
 
 #### 14.3.3. UI-ACT-03 — Thiết lập nhiệm vụ BTC trên frontend (CM-007)
 
-**UI chính:** trong tab `Nhiệm vụ BTC`, mỗi hàng nhiệm vụ có `Tên nhiệm vụ`, `Mô tả`, `Loại` (`leader`/`member`), `Bắt đầu`, `Kết thúc`, Combobox `Người phụ trách` (tìm mã/họ tên, chọn từ account đã có), nút `Thêm nhiệm vụ`, `Xóa dòng`, `Đổi người`, `Lưu tạm`. Các thao tác này chỉ sửa state/localStorage theo actorId+activityId; xóa dòng nghĩa là xóa bản tạm, không phải trạng thái `cancelled`. Có thể import nhiệm vụ Excel/PDF vào preview; user kiểm trước khi gửi publish. UI cảnh báo ngay khi trùng khoảng giờ hoặc thiếu leader nhưng *cảnh báo client không quyết định*. Không hiển thị tab cho phép sửa cấu trúc sau publish.
+**UI chính:** trong tab `Nhiệm vụ BTC`, mỗi hàng nhiệm vụ có `Tên nhiệm vụ`, `Mô tả`, `Loại` (`leader`/`member`), `Bắt đầu`, `Kết thúc`, Combobox `Người phụ trách` (tìm mã/họ tên, chọn từ account đã có), nút `Thêm nhiệm vụ`, `Xóa dòng`, `Đổi người`. Lưu phân công cùng hoạt động bằng nút `Nháp`. Các thao tác này chỉ sửa state/localStorage theo actorId+activityId; xóa dòng nghĩa là xóa bản tạm, không phải trạng thái `cancelled`. Có thể import nhiệm vụ Excel/PDF vào preview; user kiểm trước khi gửi publish. UI cảnh báo ngay khi trùng khoảng giờ hoặc thiếu leader nhưng *cảnh báo client không quyết định*. Không hiển thị tab cho phép sửa cấu trúc sau publish.
 
 **Server-side ở draft:** API tìm user/kiểm tra điều kiện gợi ý có thể đọc dữ liệu; **không** tạo/sửa/xóa bản ghi `phan_cong_nhiem_vu`. Mọi check ở client là provisional. Khi activity chưa có `activityId` (draft chưa lưu), dùng local draft key tạm rồi re-key khi tạo activity thành công. Frontend không được coi combobox đã chọn là account còn active.
 
@@ -940,6 +956,7 @@ CREATE TABLE IF NOT EXISTS hoat_dong (
     diem_hoat_dong INT NOT NULL DEFAULT 0,
     trang_thai VARCHAR(30) NOT NULL DEFAULT 'draft',
     ke_hoach_hoat_dong VARCHAR(500) NULL,
+    hinh_anh VARCHAR(500) NULL,
     PRIMARY KEY (id_hoat_dong),
     UNIQUE KEY uq_hoat_dong_de_xuat (id_de_xuat),
     KEY idx_hoat_dong_don_vi (id_don_vi),
@@ -961,6 +978,7 @@ CREATE TABLE IF NOT EXISTS chi_tiet_hoat_dong (
     thoi_gian_bat_dau DATETIME NOT NULL,
     thoi_gian_ket_thuc DATETIME NOT NULL,
     dia_diem TEXT NULL,
+    ghi_chu_dia_diem TEXT NULL,
     vi_do DECIMAL(10,7) NULL,
     kinh_do DECIMAL(10,7) NULL,
     yeu_cau_check_out BOOLEAN NOT NULL DEFAULT FALSE,
@@ -1221,9 +1239,9 @@ Swagger/OpenAPI tự sinh từ Controller + DTO để frontend tích hợp và t
 
 | ID | Tình trạng | Quy tắc Agent |
 |---|---|---|
-| `AUTH-LEADER` (`ADR-01`) | Chưa được phê duyệt dứt điểm liệu End User có thể làm Trưởng BTC | Chỉ dùng Manager active như **phương án tạm định để phân tích**. Không triển khai publish/attendance operator guard dựa vào giả định này cho tới khi chủ dự án chốt |
-| `TASK-TIME-NULL` (`ADR-09`) | Null boundary của nhiệm vụ chưa được xác nhận về nghiệp vụ | Không triển khai thuật toán chống trùng final cho các khoảng NULL trước khi chốt semantics |
-| `LEADER-COUNT` | Số lượng leader chính xác mỗi activity chưa được xác nhận từ nguồn nghiệp vụ độc lập | Không tự quy định `exactly one` khi validator publish chưa được phê duyệt |
+| `AUTH-LEADER` (`ADR-01`) | Đã chốt vai trò người nhận nhiệm vụ Trưởng BTC | Chỉ Staff active; quyền điều hành điểm danh vẫn theo nghiệp vụ riêng |
+| `TASK-TIME-NULL` (`ADR-09`) | Đã chốt bỏ nhập thời gian riêng | Giữ cột lịch sử, dùng lịch hoạt động để kiểm tra trùng |
+| `LEADER-COUNT` | Đã chốt giới hạn và điều kiện công bố | Tối đa một trong nháp, đúng một khi công bố |
 | `API-DETAILS` | Một số request/response, parameter, error mapping per endpoint chưa hiện diện trong nguồn | Không suy diễn nghiệp vụ; chốt DTO khi triển khai lát cắt dựa trên §14–16 hoặc hỏi chủ dự án nếu phát sinh chức năng/quyền mới |
 | `DB-RUNTIME` | DDL là mục tiêu; trạng thái DB đang chạy/migrations chưa được inspect trong gói nguồn | Trước migrate phải inspect DB runtime, snapshot/backup khi cần, không dùng db push tùy ý |
 | `EMAIL-DELIVERY` | Không có outbox/history nên không bảo đảm email exactly-once/durable retry qua crash | Nêu rõ best-effort sau commit, expose resend thủ công theo quyền; muốn durable retry cần phê duyệt thay đổi phạm vi |

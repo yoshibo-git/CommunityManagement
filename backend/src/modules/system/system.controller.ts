@@ -22,7 +22,9 @@ class UpdateProfileDto {
 export class SystemController {
   constructor(private readonly workspace: WorkspaceService, private readonly content: PublicContentService, private readonly auth: AuthService) {}
   @Get('system/workspace') @UseGuards(SessionGuard)
-  read(@Req() request: AuthRequest) { return this.workspace.read(request.principal); }
+  read(@Req() request: AuthRequest, @Query('includeAccounts') includeAccounts?: string) {
+    return this.workspace.read(request.principal, includeAccounts !== 'false');
+  }
   @Patch('users/me') @UseGuards(SessionGuard)
   updateProfile(@Req() request: AuthRequest, @Body() body: UpdateProfileDto) {
     this.auth.assertOrigin(request);

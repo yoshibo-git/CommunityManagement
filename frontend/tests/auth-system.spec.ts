@@ -95,12 +95,12 @@ test('public feed lists persisted posts without search; login failure never clai
   await expect(page.getByRole('searchbox')).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Tin tức', exact: true })).toBeVisible();
   await page.goto('/login');
-  await expect(page.getByRole('button', { name: 'Quên mật khẩu?' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Quên mật khẩu?' })).toBeEnabled();
   await expect(page.getByRole('button', { name: 'Đặt lại FaceIO', exact: true })).toBeDisabled();
   await page.getByLabel('Mã sinh viên / Mã nhân sự').fill(`missing-${Date.now()}`);
   await page.getByLabel('Mật khẩu', { exact: true }).fill('incorrect-password');
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
-  await expect(page.getByRole('main').getByRole('alert')).toContainText('không đúng');
+  await expect(page.getByRole('list', { name: 'Thông báo thao tác' })).toContainText('không đúng');
   await expect(page).toHaveURL('/login');
   await expect(page.getByRole('button', { name: 'Quét khuôn mặt' })).toHaveCount(0);
   expect(await page.evaluate(() => localStorage.length)).toBe(0);
@@ -132,6 +132,6 @@ test('network failure displays Vietnamese error without navigating or claiming s
   await page.getByLabel('Mã sinh viên / Mã nhân sự').fill('sinhvien1');
   await page.getByLabel('Mật khẩu', { exact: true }).fill(password!);
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
-  await expect(page.getByRole('main').getByRole('alert')).toHaveText('Không thể kết nối dịch vụ đăng nhập. Vui lòng thử lại.');
+  await expect(page.getByRole('list', { name: 'Thông báo thao tác' })).toContainText('Không thể kết nối dịch vụ đăng nhập. Vui lòng thử lại.');
   await expect(page).toHaveURL('/login');
 });

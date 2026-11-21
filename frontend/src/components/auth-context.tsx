@@ -15,10 +15,11 @@ async function readSession(): Promise<User | null> {
 }
 const AuthContext = createContext<{ user: User | null; status: 'loading' | 'ready' | 'error'; reload: () => Promise<User | null>; logout: () => Promise<void> } | null>(null);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+export function AuthProvider({ children, initialUser }: { children: React.ReactNode; initialUser: User | null }) {
+  const [user, setUser] = useState(initialUser);
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('ready');
   const pathname = usePathname();
+  const protectedPage = pathname === '/system' || pathname.startsWith('/system/');
   const router = useRouter();
   const reload = useCallback(async () => {
     const current = await readSession();
@@ -27,10 +28,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return current;
   }, []);
   useEffect(() => {
+    if (!protectedPage) return;
     let active = true;
     void readSession().then((value) => { if (active) { setUser(value); setStatus('ready'); } }).catch(() => { if (active) setStatus('error'); });
     return () => { active = false; };
-  }, [pathname]);
+  }, [pathname, protectedPage]);
   async function logout() {
     const response = await fetch('/api/backend/auth/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
     if (!response.ok) throw new Error('Không thể đăng xuất. Vui lòng thử lại.');
@@ -39,7 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.replace('/login');
     router.refresh();
   }
-  return <AuthContext.Provider value={{ user, status, reload, logout }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ user, status: protectedPage ? status : 'ready', reload, logout }}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

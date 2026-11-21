@@ -12,6 +12,12 @@ const roles = ['user', 'staff', 'admin'];
 const enrollmentTtl = 300;
 type FacePurpose = 'enroll' | 'verify';
 
+function canEnrollPendingFace(user: { trang_thai: string; loai_nguoi_dung: string | null; vai_tro: { ten_vai_tro: string }; thong_tin_sinh_trac: unknown }) {
+  return process.env.NODE_ENV === 'development' && process.env.FACE_ENROLLMENT_DEMO === 'true' &&
+    user.trang_thai === 'pending_faceio' && user.vai_tro.ten_vai_tro === 'user' &&
+    user.loai_nguoi_dung === 'student' && !user.thong_tin_sinh_trac;
+}
+
 @Injectable()
 export class AuthService implements OnModuleDestroy {
   private client?: ReturnType<typeof createClient>;
@@ -78,18 +84,17 @@ export class AuthService implements OnModuleDestroy {
       const networkKey = `cm:login-ip:${createHash('sha256').update(address).digest('hex')}`;
       const attempts = await redis.eval("local n=redis.call('INCR',KEYS[1]); if n==1 then redis.call('EXPIRE',KEYS[1],900) end; return n", { keys: [networkKey], arguments: [] });
       if (Number(attempts) > 100) throw new HttpException({ code: 'RATE_LIMITED', message: 'Quá nhiều yêu cầu. Vui lòng thử lại sau.' }, 429);
-      if (await redis.exists(`${key}:blocked`)) throw new HttpException({ code: 'LOGIN_TEMP_LOCKED', message: 'Đăng nhập tạm khóa. Vui lòng thử lại sau.' }, 429);
+      if (await redis.exists(`${key}:blocked`)) throw new HttpException({ code: 'LOGIN_TEMP_LOCKED', message: 'Bạn đã nhập sai thông tin quá 5 lần. Vui lòng thử lại sau 15 phút!.' }, 429);
       const user = await this.prisma.nguoi_dung.findUnique({ where: { ten_dang_nhap: username }, include: { vai_tro: true, khoa: true, thong_tin_sinh_trac: true } });
       const valid = user ? await verifyPassword(password, user.mat_khau) : (await hashPassword(password), false);
-      if (!valid || !user || user.trang_thai !== 'active' || !roles.includes(user.vai_tro.ten_vai_tro)) {
+      if (!valid || !user || (user.trang_thai !== 'active' && !canEnrollPendingFace(user)) || !roles.includes(user.vai_tro.ten_vai_tro)) {
         await redis.eval("local n=redis.call('INCR',KEYS[1]); if n==1 then redis.call('EXPIRE',KEYS[1],900) end; if n>=5 then redis.call('SET',KEYS[2],'1','EX',900) end; return n", { keys: [key, `${key}:blocked`], arguments: [] });
         throw new UnauthorizedException({ code: 'AUTH_REQUIRED', message: 'Tên đăng nhập hoặc mật khẩu không đúng.' });
       }
       const current = await this.user(user.id_nguoi_dung);
       if (!current || current.mat_khau !== user.mat_khau) throw new UnauthorizedException();
-      const principal = this.publicUser(current);
-      if (process.env.FACE_ENROLLMENT_DEMO === 'true' && principal.role === 'user') {
-        if (principal.type !== 'student') throw new UnauthorizedException();
+      if (process.env.FACE_ENROLLMENT_DEMO === 'true' && current.vai_tro.ten_vai_tro === 'user') {
+        if (current.loai_nguoi_dung !== 'student' || (current.trang_thai !== 'active' && !canEnrollPendingFace(current))) throw new UnauthorizedException();
         if (current.thong_tin_sinh_trac && !current.thong_tin_sinh_trac.mau_khuon_mat) throw new ServiceUnavailableException();
         const purpose: FacePurpose = current.thong_tin_sinh_trac ? 'verify' : 'enroll';
         const ticket = randomBytes(32).toString('hex');
@@ -127,7 +132,7 @@ export class AuthService implements OnModuleDestroy {
     if (typeof claim !== 'string') throw new UnauthorizedException();
     const state = JSON.parse(claim) as { userId: number; fingerprint: string; expiresAt: number };
     const check = (user: Parameters<AuthService['fingerprint']>[0] & { loai_nguoi_dung: string | null }) => {
-      if (Date.now() >= state.expiresAt || user.trang_thai !== 'active' ||
+      if (Date.now() >= state.expiresAt || (user.trang_thai !== 'active' && !(purpose === 'enroll' && canEnrollPendingFace(user))) ||
         user.vai_tro.ten_vai_tro !== 'user' || user.loai_nguoi_dung !== 'student' ||
         this.fingerprint(user) !== state.fingerprint ||
         Boolean(user.thong_tin_sinh_trac) !== (purpose === 'verify')) throw new UnauthorizedException();
@@ -158,6 +163,9 @@ export class AuthService implements OnModuleDestroy {
         await tx.thong_tin_sinh_trac.create({ data: {
           id_nguoi_dung: state.userId, id_khuon_mat: faceId, mau_khuon_mat: template, ngay_dang_ky: new Date(),
         } });
+        if (user.trang_thai === 'pending_faceio') {
+          await tx.nguoi_dung.update({ where: { id_nguoi_dung: state.userId }, data: { trang_thai: 'active' } });
+        }
       });
       if (!await redis.del(key)) throw new UnauthorizedException();
       return { registered: true as const };

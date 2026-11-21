@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { activityImageUrl } from '../activities/activity-image';
 import sanitize from 'sanitize-html';
 import { PrismaService } from '../../prisma/prisma.service';
 
@@ -29,9 +30,9 @@ export class PublicContentService {
     return { items, nextCursor: records.length > 10 && last ? `${last.publishedAt}_${last.id}` : null };
   }
   async activities() {
-    const records = await this.prisma.hoat_dong.findMany({ where: { trang_thai: { in: ['published', 'pending', 'progress', 'pending_completed', 'completed', 'issues'] } }, orderBy: { id_hoat_dong: 'desc' }, take: 10,
-      select: { id_hoat_dong: true, ten_hoat_dong: true, trang_thai: true, chi_tiet_hoat_dong: { select: { dia_diem: true, thoi_gian_bat_dau: true } } },
+    const records = await this.prisma.hoat_dong.findMany({ where: { trang_thai: { in: ['published', 'pending', 'progress'] } }, orderBy: { id_hoat_dong: 'desc' }, take: 10,
+      select: { id_hoat_dong: true, ten_hoat_dong: true, trang_thai: true, hinh_anh: true, chi_tiet_hoat_dong: { select: { dia_diem: true, thoi_gian_bat_dau: true } } },
     });
-    return { items: records.map((row) => ({ id: row.id_hoat_dong, name: row.ten_hoat_dong, location: row.chi_tiet_hoat_dong?.dia_diem ?? null, startAt: row.chi_tiet_hoat_dong?.thoi_gian_bat_dau.toISOString() ?? null })) };
+    return { items: records.map((row) => ({ id: row.id_hoat_dong, name: row.ten_hoat_dong, status: row.trang_thai, imageUrl: activityImageUrl(row.id_hoat_dong, row.hinh_anh), location: row.chi_tiet_hoat_dong?.dia_diem ?? null, startAt: row.chi_tiet_hoat_dong?.thoi_gian_bat_dau.toISOString() ?? null })) };
   }
 }
