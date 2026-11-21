@@ -1,5 +1,7 @@
 'use client';
 
+import { ChangePasswordForm } from './change-password-form';
+import { PersonalProfile } from './personal-profile';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from './icon';
@@ -98,6 +100,9 @@ export function UserWorkspace({ data, view, activityId }: {
 
         {view === 'tasks' && <>{tasks.length ? tasks.map((task) => <article className="surface task-card" key={task.id}><span className="status-label">{statusLabels[task.status] ?? 'Chưa xác định'}</span><h2>{task.name}</h2><p>{task.activity}</p><p>Thời hạn: {dateTime(task.startAt)} — {dateTime(task.endAt)}</p><div className="activity-card-actions"><button className="button button-primary" disabled>Bắt đầu</button><button className="button button-outline" disabled>Báo hoàn thành</button></div></article>) : <div className="surface workspace-empty"><h2>Chưa có nhiệm vụ được giao</h2></div>}</>}
 
-        {view === 'profile' && <div className="profile-layout"><section className="surface profile-card"><h2>Thông tin cá nhân</h2><dl className="activity-facts"><div><dt>Họ và tên</dt><dd>{data.user.name}</dd></div><div><dt>Mã tài khoản</dt><dd>{data.user.username}</dd></div><div><dt>Email</dt><dd>{data.user.email}</dd></div><div><dt>Khoa</dt><dd>{data.user.faculty}</dd></div><div><dt>Vai trò</dt><dd>{roleLabels[data.user.role]}</dd></div></dl><div className="field"><label htmlFor="profile-phone">Số điện thoại</label><input id="profile-phone" type="tel" value={data.user.phone ?? ''} disabled /></div><button className="button button-primary" disabled>Lưu số điện thoại</button></section><section className="surface profile-card"><h2>Bảo mật tài khoản</h2><fieldset disabled><div className="field"><label htmlFor="current-password">Mật khẩu hiện tại</label><input id="current-password" type="password" autoComplete="current-password" /></div><div className="field"><label htmlFor="new-password">Mật khẩu mới</label><input id="new-password" type="password" autoComplete="new-password" /></div><div className="field"><label htmlFor="confirm-password">Xác nhận mật khẩu mới</label><input id="confirm-password" type="password" autoComplete="new-password" /></div></fieldset><div className="activity-card-actions"><button className="button button-primary" disabled>Đổi mật khẩu</button><button className="button button-outline" disabled>Đặt lại FaceIO</button></div></section></div>}
+        {view === 'profile' && <div className="profile-layout">
+          <PersonalProfile user={data.user} />
+          <section className="surface profile-card"><h2>Bảo mật tài khoản</h2><ChangePasswordForm /></section>
+        </div>}
   </div>;
 }

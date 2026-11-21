@@ -1,31 +1,38 @@
 import { expect, test } from '@playwright/test';
 import { resolve } from 'node:path';
 import { createRequire } from 'node:module';
+import { randomUUID } from 'node:crypto';
 
 test('staff creates/edits a draft, preserves local assignments and cannot edit an activity after it starts', async ({ page, context }, testInfo) => {
   test.setTimeout(60000);
-  const password = process.env.TEST_ACCOUNT_PASSWORD;
-  expect(password).toBeTruthy();
-  // Real API writes are checked against MySQL; this test only removes its own uniquely named record.
+  // Real API writes are checked against MySQL using isolated fixtures.
   const backendRequire = createRequire(resolve('../backend/package.json'));
   backendRequire('dotenv').config({ path: resolve('../backend/.env'), quiet: true });
   const { PrismaService } = backendRequire('./dist/prisma/prisma.service');
+  const { hashPassword } = backendRequire('./dist/common/security/password');
   const db = new PrismaService();
   let id: number | undefined;
-  const prefix = `ui-test-${Date.now()}`;
+  let staffId: number | undefined;
+  const prefix = `ui-test-${randomUUID()}`;
+  const password = randomUUID();
   try {
+    const staff = await db.nguoi_dung.create({ data: {
+      ten_dang_nhap: prefix, email: `${prefix}@example.invalid`, ho_ten: 'Cán bộ kiểm thử',
+      mat_khau: await hashPassword(password), trang_thai: 'active', loai_nguoi_dung: 'staff',
+      vai_tro: { connect: { ten_vai_tro: 'staff' } },
+    } });
+    staffId = staff.id_nguoi_dung;
     await page.route('https://tile.openstreetmap.org/**', (route) => route.fulfill({ contentType: 'image/png', body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jWZkAAAAASUVORK5CYII=', 'base64') }));
     await page.route('https://photon.komoot.io/api/**', (route) => route.fulfill({ json: { features: [] } }));
     await context.grantPermissions(['geolocation']);
     await context.setGeolocation({ latitude: 16.08, longitude: 108.23, accuracy: 10 });
     await page.goto('/login');
-    await page.getByLabel('Mã sinh viên / Mã nhân sự').fill('canbo1');
-    await page.getByLabel('Mật khẩu', { exact: true }).fill(password!);
+    await page.getByLabel('Mã sinh viên / Mã nhân sự').fill(prefix);
+    await page.getByLabel('Mật khẩu', { exact: true }).fill(password);
     await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
     await expect(page).toHaveURL('/');
     await page.goto('/system?view=activities');
     await expect(page.getByRole('group', { name: 'Nhóm hoạt động' }).getByRole('button', { name: 'Bản nháp', exact: true })).toHaveAttribute('aria-pressed', 'true');
-    await expect(page.getByRole('heading', { name: 'Ngày xanh khuôn viên', exact: true })).toBeVisible();
     await page.getByRole('link', { name: 'Tạo hoạt động', exact: true }).click();
     const back = page.getByRole('link', { name: 'Quay lại', exact: true });
     await expect(back).toHaveAttribute('href', '/system?view=activities');
@@ -33,11 +40,19 @@ test('staff creates/edits a draft, preserves local assignments and cannot edit a
     const backBox = await back.boundingBox(), titleBox = await page.getByRole('heading', { level: 1 }).boundingBox();
     expect(backBox!.y).toBeLessThan(titleBox!.y); expect(backBox!.x).toBe(titleBox!.x);
     await page.getByLabel('Tên hoạt động', { exact: true }).fill(prefix);
+    const confirmation = page.waitForEvent('dialog');
+    const leaving = back.click();
+    const dialog = await confirmation;
+    expect(dialog.message()).toBe('Bạn có thay đổi chưa lưu. Rời trang?');
+    await dialog.dismiss();
+    await leaving;
     const created = page.waitForResponse((response) => response.url().endsWith('/api/backend/activities') && response.request().method() === 'POST');
     await page.getByRole('button', { name: 'Lưu nháp', exact: true }).click();
     const response = await created;
     expect(response.status()).toBe(201); id = (await response.json()).id;
     await expect(page).toHaveURL(`/system?view=activities&editor=${id}`);
+    const toasts = page.getByRole('list', { name: 'Thông báo thao tác' });
+    await expect(toasts.getByText('Đã lưu hoạt động nháp.', { exact: true })).toBeVisible();
     await expect(page.getByLabel('Tên hoạt động', { exact: true })).toHaveValue(prefix);
     await expect(page.getByRole('button', { name: 'Công bố', exact: true })).toBeDisabled();
     await page.getByRole('button', { name: 'Phân công', exact: true }).click();
@@ -45,6 +60,7 @@ test('staff creates/edits a draft, preserves local assignments and cannot edit a
     await page.getByLabel('Tên nhiệm vụ', { exact: true }).fill('Chuẩn bị vật dụng');
     await page.getByLabel('Người phụ trách', { exact: true }).selectOption({ label: 'sinhvien1 — Sinh viên 1' });
     await page.getByRole('button', { name: 'Lưu tạm', exact: true }).click();
+    await expect(toasts.getByText('Đã lưu phân công tạm trong trình duyệt.', { exact: true })).toBeVisible();
     await page.reload();
     await page.getByRole('button', { name: 'Phân công', exact: true }).click();
     await expect(page.getByLabel('Tên nhiệm vụ', { exact: true })).toHaveValue('Chuẩn bị vật dụng');
@@ -63,7 +79,7 @@ test('staff creates/edits a draft, preserves local assignments and cannot edit a
     const updated = page.waitForResponse((response) => response.url().endsWith(`/api/backend/activities/${id}`) && response.request().method() === 'PATCH');
     await page.getByRole('button', { name: 'Lưu nháp', exact: true }).click();
     expect((await updated).status()).toBe(200);
-    await expect(page.getByRole('status')).toContainText('Đã lưu hoạt động nháp.');
+    await expect(toasts.getByText('Đã lưu hoạt động nháp.', { exact: true })).toBeVisible();
     const stored = await db.chi_tiet_hoat_dong.findUnique({ where: { id_hoat_dong: id } });
     expect(stored.thoi_gian_bat_dau.toISOString()).toBe('2027-03-01T01:00:00.000Z');
     expect(Number(stored.vi_do)).toBeCloseTo(16.08, 6);
@@ -83,6 +99,7 @@ test('staff creates/edits a draft, preserves local assignments and cannot edit a
     await expect(page.getByRole('link', { name: 'Chỉnh sửa hoạt động', exact: true })).toHaveCount(0);
   } finally {
     if (id) await db.hoat_dong.deleteMany({ where: { id_hoat_dong: id, ten_hoat_dong: { startsWith: prefix } } });
+    if (staffId) await db.nguoi_dung.deleteMany({ where: { id_nguoi_dung: staffId, ten_dang_nhap: prefix } });
     await db.$disconnect();
   }
 });

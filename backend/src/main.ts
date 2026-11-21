@@ -9,7 +9,8 @@ async function bootstrap() {
   try {
     configureApp(app, config);
     app.enableShutdownHooks();
-    await app.listen(config.port);
+    if (process.env.FACE_ENROLLMENT_DEMO === 'true') await app.listen(config.port, '127.0.0.1');
+    else await app.listen(config.port);
     console.log(`Backend is running at: http://localhost:${config.port}/api/v1`);
   } catch (error) {
     await app.close();

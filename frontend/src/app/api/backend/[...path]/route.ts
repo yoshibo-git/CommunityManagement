@@ -2,11 +2,39 @@ import { NextRequest } from 'next/server';
 import { backendUrl } from '@/lib/backend';
 
 const routes = new Map([
+  ['PATCH:users/me', 'users/me'],
   ['GET:auth/session', 'auth/session'], ['POST:auth/login/password', 'auth/login/password'],
+  ['POST:auth/face/enroll', 'auth/face/enroll'],
+  ['POST:auth/login/face', 'auth/login/face'], ['POST:auth/password/change', 'auth/password/change'],
   ['POST:auth/logout', 'auth/logout'], ['GET:posts/public', 'posts/public'], ['GET:activities', 'activities'],
   ['GET:notifications', 'notifications'], ['POST:activities', 'activities'],
   ['GET:activities/assignees', 'activities/assignees'],
 ]);
+
+async function readEnrollmentBody(request: NextRequest) {
+  const limit = 2 * 1024 * 1024 + 8192;
+  const body = request.body?.getReader();
+  if (!body) return new Uint8Array();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  while (true) {
+    const { value, done } = await body.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > limit) {
+      await body.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  const result = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    result.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return result;
+}
 
 async function forward(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
   const path = (await context.params).path.join('/');
@@ -26,7 +54,17 @@ async function forward(request: NextRequest, context: { params: Promise<{ path: 
   try {
     const url = backendUrl(target);
     url.search = request.nextUrl.search;
-    const upstream = await fetch(url, { method: request.method, headers, body: ['POST', 'PATCH'].includes(request.method) ? await request.text() : undefined, cache: 'no-store', redirect: 'manual', signal: AbortSignal.timeout(10000) });
+    let body: BodyInit | undefined;
+    if (target === 'auth/face/enroll' || target === 'auth/login/face') {
+      const authorization = request.headers.get('authorization');
+      if (authorization) headers.set('authorization', authorization);
+      const upload = await readEnrollmentBody(request);
+      if (!upload) return Response.json({ message: 'Ảnh vượt quá dung lượng cho phép.' }, { status: 413 });
+      body = upload;
+    } else if (['POST', 'PATCH'].includes(request.method)) {
+      body = await request.text();
+    }
+    const upstream = await fetch(url, { method: request.method, headers, body, cache: 'no-store', redirect: 'manual', signal: AbortSignal.timeout(10000) });
     const resultHeaders = new Headers({ 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
     for (const key of ['set-cookie', 'x-request-id']) {
       const value = upstream.headers.get(key);

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ActivityBackLink } from './activity-back-link';
 import { LocationPicker } from './location-picker';
+import { useToast } from './toast';
 
 type Draft = { id?: number; status: string; editable: boolean; revision?: string; name: string; description: string | null; startAt: string | null; endAt: string | null; location: string | null; latitude: number | null; longitude: number | null; capacity: number | null; points: number; requiresCheckout: boolean };
 type Assignment = { key: string; userId: string; name: string; description: string; type: 'leader' | 'member'; startAt: string; endAt: string };
@@ -27,6 +28,7 @@ function validAssignments(value: unknown): value is { v: 1; assignments: Assignm
 
 export function ActivityEditor({ actorId, id }: { actorId: number; id: number | null }) {
   const router = useRouter();
+  const toast = useToast();
   const [draft, setDraft] = useState<Draft | null>(null);
   const [tab, setTab] = useState('information');
   const [assignments, setAssignments] = useState<Assignment[]>([]);
@@ -109,15 +111,22 @@ export function ActivityEditor({ actorId, id }: { actorId: number; id: number | 
     try {
       const { name, description, startAt, endAt, location, latitude, longitude, capacity, points, requiresCheckout } = draft;
       const response = await fetch(`/api/backend/activities${draft.id ? `/${draft.id}` : ''}`, { method: draft.id ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, description, startAt, endAt, location, latitude, longitude, capacity, points, requiresCheckout, ...(draft.id ? { revision: draft.revision } : {}) }) });
-      if (!response.ok) { const body = await response.json(); setError(body.message ?? 'Không thể lưu hoạt động.'); return; }
+      if (!response.ok) {
+        const body = await response.json() as { message?: string };
+        const message = body.message ?? 'Không thể lưu hoạt động.';
+        if (response.status === 400 || response.status === 422) setError(message);
+        else toast('error', message);
+        return;
+      }
       const result = await response.json() as { id: number };
+      toast('success', draft.status === 'draft' ? 'Đã lưu hoạt động nháp.' : 'Đã cập nhật hoạt động.');
       const saved = await readDraft(result.id);
-      setDraft(saved); setDirty(false); setMessage('Đã lưu hoạt động nháp.');
+      setDraft(saved); setDirty(false);
       try {
         storeAssignments(result.id);
         if (!draft.id) { localStorage.removeItem(key(null)); router.replace(`/system?view=activities&editor=${result.id}`); }
-      } catch { setError('Hoạt động đã được lưu; không thể lưu phân công tạm. Hãy giữ trang này và thử lưu tạm lại.'); }
-    } catch { setError('Không thể kết nối dịch vụ. Vui lòng tải lại trước khi thử lưu lại.'); }
+      } catch { toast('warning', 'Hoạt động đã được lưu; không thể lưu phân công tạm. Hãy giữ trang này và thử lưu tạm lại.'); }
+    } catch { toast('error', 'Không thể tải phản hồi từ dịch vụ. Vui lòng kiểm tra trạng thái hoạt động trước khi lưu lại.'); }
     finally { setSaving(false); }
   }
   if (!draft) return <div className="container system-workspace"><h1>{id ? 'Chỉnh sửa hoạt động' : 'Tạo hoạt động'}</h1>{error ? <p role="alert">{error}</p> : <p role="status">Đang tải hoạt động…</p>}</div>;
@@ -155,7 +164,7 @@ export function ActivityEditor({ actorId, id }: { actorId: number; id: number | 
             <div className="field"><label htmlFor={`task-start-${row.key}`}>Bắt đầu nhiệm vụ</label><input id={`task-start-${row.key}`} type="datetime-local" value={row.startAt} onChange={(event) => changeAssignment(index, 'startAt', event.target.value)} /></div>
             <div className="field"><label htmlFor={`task-end-${row.key}`}>Kết thúc nhiệm vụ</label><input id={`task-end-${row.key}`} type="datetime-local" value={row.endAt} onChange={(event) => changeAssignment(index, 'endAt', event.target.value)} /></div>
           </div><button className="text-button" type="button" onClick={() => { setAssignments((current) => current.filter((item) => item.key !== row.key)); setAssignmentDirty(true); }}>Xóa nhiệm vụ</button></section>)}
-          <div className="activity-card-actions"><button className="button button-outline" type="button" onClick={() => { setAssignments((current) => [...current, { key: crypto.randomUUID(), userId: '', name: '', description: '', type: 'member', startAt: '', endAt: '' }]); setAssignmentDirty(true); }}>Thêm nhiệm vụ</button><button className="button button-outline" type="button" onClick={() => { try { storeAssignments(); setMessage('Đã lưu phân công tạm trong trình duyệt.'); } catch { setError('Không thể lưu phân công tạm. Kiểm tra dung lượng hoặc quyền lưu trữ của trình duyệt.'); } }}>Lưu tạm</button></div>
+          <div className="activity-card-actions"><button className="button button-outline" type="button" onClick={() => { setAssignments((current) => [...current, { key: crypto.randomUUID(), userId: '', name: '', description: '', type: 'member', startAt: '', endAt: '' }]); setAssignmentDirty(true); }}>Thêm nhiệm vụ</button><button className="button button-outline" type="button" onClick={() => { try { storeAssignments(); toast('success', 'Đã lưu phân công tạm trong trình duyệt.'); } catch { toast('error', 'Không thể lưu phân công tạm. Kiểm tra dung lượng hoặc quyền lưu trữ của trình duyệt.'); } }}>Lưu tạm</button></div>
         </div>
       </fieldset>
       {error && <p className="form-error" role="alert">{error}</p>}{message && <p role="status">{message}</p>}

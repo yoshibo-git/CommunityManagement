@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useState } from 'rea
 import { usePathname, useRouter } from 'next/navigation';
 import type { WorkspaceData } from '@/lib/workspace';
 import { Icon } from './icon';
+import { useToast } from './toast';
 
 type User = WorkspaceData['user'];
 async function readSession(): Promise<User | null> {
@@ -12,7 +13,7 @@ async function readSession(): Promise<User | null> {
   if (!response.ok) throw new Error('Session unavailable.');
   return response.json() as Promise<User>;
 }
-const AuthContext = createContext<{ user: User | null; status: 'loading' | 'ready' | 'error'; reload: () => Promise<void>; logout: () => Promise<void> } | null>(null);
+const AuthContext = createContext<{ user: User | null; status: 'loading' | 'ready' | 'error'; reload: () => Promise<User | null>; logout: () => Promise<void> } | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -20,8 +21,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const reload = useCallback(async () => {
-    setUser(await readSession());
+    const current = await readSession();
+    setUser(current);
     setStatus('ready');
+    return current;
   }, []);
   useEffect(() => {
     let active = true;
@@ -47,6 +50,6 @@ export function useAuth() {
 
 export function LogoutButton({ className = 'text-button', showIcon = false, onLogout }: { className?: string; showIcon?: boolean; onLogout?: () => void }) {
   const { logout } = useAuth();
-  const [error, setError] = useState('');
-  return <><button type="button" className={className} onClick={() => { setError(''); void logout().then(onLogout).catch(() => setError('Không thể đăng xuất. Vui lòng thử lại.')); }}>{showIcon && <Icon name="logout" />}Đăng xuất</button>{error && <p role="alert">{error}</p>}</>;
+  const toast = useToast();
+  return <button type="button" className={className} onClick={() => { void logout().then(onLogout).catch(() => toast('error', 'Không thể đăng xuất. Vui lòng thử lại.')); }}>{showIcon && <Icon name="logout" />}Đăng xuất</button>;
 }

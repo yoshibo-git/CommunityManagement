@@ -22,6 +22,17 @@ export function readDatabaseConfig(environment = process.env) {
 
 export function readEnvironment(environment = process.env) {
   readDatabaseConfig(environment);
+  if (environment.FACE_ENROLLMENT_DEMO === 'true') {
+    if (environment.NODE_ENV !== 'development' || environment.AUTH_PASSWORD_ONLY !== 'true') {
+      throw new Error('Face enrollment demo requires local password authentication.');
+    }
+    const service = new URL(environment.FACE_EMBEDDING_URL ?? '');
+    if (service.origin !== 'http://127.0.0.1:8000' || service.pathname !== '/internal/v1/face/embedding' ||
+      service.username || service.password || service.search || service.hash) throw new Error('Invalid local embedding URL.');
+    if (!/^[a-f0-9]{64}$/.test(environment.FACE_TEMPLATE_KEY ?? '') ||
+      !/^[a-f0-9]{64}$/.test(environment.FACE_EMBEDDING_TOKEN ?? '') ||
+      !environment.FACE_TEMPLATE_KID) throw new Error('Face enrollment secrets are required.');
+  }
   if (environment.AUTH_PASSWORD_ONLY !== undefined && !['true', 'false'].includes(environment.AUTH_PASSWORD_ONLY)) throw new Error('AUTH_PASSWORD_ONLY must be true or false.');
   if (environment.AUTH_PASSWORD_ONLY === 'true') {
     if (environment.NODE_ENV === 'production') throw new Error('Password-only authentication is disabled in production.');

@@ -241,6 +241,8 @@ model thong_tin_sinh_trac {
   id_sinh_trac  Int        @id @default(autoincrement()) @db.UnsignedInt
   id_nguoi_dung Int        @unique(map: "uq_sinh_trac_nguoi_dung") @db.UnsignedInt
   id_khuon_mat  String     @unique(map: "uq_sinh_trac_khuon_mat") @db.VarChar(255)
+  mau_khuon_mat Json?
+  ngay_dang_ky  DateTime?  @db.DateTime(0)
   /// Database-managed ON UPDATE CURRENT_TIMESTAMP is preserved in migration SQL.
   /// Prisma cannot model this clause; preserve it when altering this column.
   ngay_cap_nhat DateTime   @default(now()) @db.DateTime(0)

@@ -545,6 +545,8 @@ Các mục UI bên dưới là **hợp đồng hành vi** của hệ thống; k�
 
 #### 14.2.2. UI-ACC-02 — Kích hoạt, đăng ký FaceIO và đăng nhập
 
+**Demo local OpenBiometrics.** Khi `FACE_ENROLLMENT_DEMO=true` trong development, sinh viên `user/student` xác thực mật khẩu trước mọi lần đăng nhập. Sinh viên chưa có mẫu nhận ticket đăng ký và gửi ảnh qua `POST /api/v1/auth/face/enroll`. Sau khi lưu mẫu AES-256-GCM, API trả `{ registered: true }` và không cấp `cm_sid`. Sinh viên có mẫu nhận ticket xác minh và gửi ảnh mới qua `POST /api/v1/auth/login/face`. Hai route nhận Bearer ticket và multipart `image` tối đa 2 MiB, yêu cầu đúng một mặt. Ticket Redis TTL 5 phút, tối đa 5 lượt, gắn với tài khoản, fingerprint và mục đích. NestJS chỉ cấp phiên sau khi xác minh 1:1 thành công với mẫu hiện có và tiêu thụ ticket. Staff/admin giữ luồng mật khẩu local. Ngưỡng cosine 0.4 chỉ dành cho demo. Active/passive liveness tắt và chưa kiểm chứng chống ảnh tĩnh hoặc video phát lại.
+
 **UI:**
 - `Kích hoạt tài khoản`: link một lần, form đặt/xác nhận mật khẩu; trạng thái link hết hạn/đã dùng có thông báo và hướng dẫn liên hệ Admin.
 - `Đăng ký khuôn mặt`: hướng dẫn quyền camera, vùng khung mặt, trạng thái `Đang xác minh/Thử lại`; chỉ hiển thị hoàn tất sau provider/backend xác nhận.
@@ -555,6 +557,8 @@ Các mục UI bên dưới là **hợp đồng hành vi** của hệ thống; k�
 **Biên/lỗi:** 5 lần sai, hết tạm khóa; camera bị chặn; provider từ chối/timeout; preauth expired/used/replayed; account bị khóa hoặc đổi mật khẩu/FaceIO khi ticket đang chờ; Redis outage; hai request cùng ticket; login cùng lúc với khóa tài khoản. Không có fallback cấp phiên không FaceIO.
 
 #### 14.2.3. UI-ACC-03 — Phục hồi và quản lý Session
+
+**Đổi mật khẩu:** `POST /api/v1/auth/password/change` dùng phiên hiện tại, xác minh Argon2id, yêu cầu mật khẩu mới khác mật khẩu cũ, tối thiểu 8 ký tự và xác nhận trùng nhau. Cập nhật hash dưới khóa người dùng. Thay hash làm các phiên và ticket cũ mất hiệu lực khi đối chiếu fingerprint. Phản hồi thành công xóa cookie hiện tại và yêu cầu đăng nhập lại. Mẫu khuôn mặt được bảo toàn.
 
 **UI:** `Quên mật khẩu` nhận email, luôn trả thông điệp trung tính; `Đặt lại mật khẩu` có password/confirm; `Đặt lại FaceIO` nhập email, sau link phải nhập mật khẩu hiện tại rồi đăng ký mặt mới. Hồ sơ cá nhân hiển thị các trường chính thức read-only, tự sửa số điện thoại; màn đổi mật khẩu và nút `Đăng xuất`, `Đăng xuất tất cả thiết bị`.
 

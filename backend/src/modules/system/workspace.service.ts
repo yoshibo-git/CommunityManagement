@@ -1,10 +1,20 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { Principal } from '../auth/auth.service';
+import { AuthService, Principal } from '../auth/auth.service';
 
 @Injectable()
 export class WorkspaceService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly auth: AuthService) {}
+
+  async updatePhone(user: Principal, phone: string | null) {
+    return this.prisma.runInTransaction(async (tx) => {
+      await this.auth.lockForWrite(tx, user, user.role);
+      const updated = await tx.nguoi_dung.update({
+        where: { id_nguoi_dung: user.id }, data: { so_dien_thoai: phone }, select: { so_dien_thoai: true },
+      });
+      return { phone: updated.so_dien_thoai };
+    });
+  }
 
   async notifications(userId: number) {
     const rows = await this.prisma.nguoi_nhan_thong_bao.findMany({ where: { id_nguoi_dung: userId }, orderBy: { id_thong_bao: 'desc' }, take: 10,
